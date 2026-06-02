@@ -1,0 +1,2 @@
+/api/* https://pkkii.pendidikan.unair.ac.id/smks/api.php?resource=:splat 200
+/* /index.html 200

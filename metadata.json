@@ -1,0 +1,8 @@
+{
+  "name": "Remix: SMKS RSUA",
+  "description": "Sistem Manajemen Kinerja Strategis (SMKS) Rumah Sakit Universitas Airlangga untuk Pendidikan, Pelatihan, serta Inovasi \u0026 Penelitian.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
