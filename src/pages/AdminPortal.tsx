@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, ShieldCheck, ArrowLeft, Plus, Trash2, Edit, Lock, Loader2 } from 'lucide-react';
+import { Users, Building, ShieldCheck, ArrowLeft, Plus, Trash2, Edit, Lock, Loader2, Upload, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle, X, HelpCircle, Search } from 'lucide-react';
 import { motion } from 'motion/react';
 import { fetchApi } from '../lib/api';
+import * as XLSX from 'xlsx';
 
 interface AdminPortalProps {
   onBack: () => void;
@@ -20,6 +21,31 @@ interface UnitKSM {
   name: string;
 }
 
+const sortUnitsByImportOrder = (unitsList: UnitKSM[]): UnitKSM[] => {
+  return [...unitsList].sort((a, b) => {
+    const parseIdSuffix = (id: string) => {
+      const parts = id.split('_');
+      if (parts.length >= 3) {
+        const idxPart = parts.length >= 4 ? parts[2] : parts[parts.length - 1];
+        const idx = parseInt(idxPart, 10);
+        if (!isNaN(idx)) return { isImported: true, index: idx, ts: parseInt(parts[1], 10) || 0 };
+      }
+      return { isImported: false, index: 0, ts: parseInt(parts[1], 10) || parseInt(id.replace(/\D/g, ''), 10) || 0 };
+    };
+
+    const infoA = parseIdSuffix(a.id);
+    const infoB = parseIdSuffix(b.id);
+
+    if (infoA.isImported && infoB.isImported) {
+      if (infoA.ts !== infoB.ts) {
+        return infoA.ts - infoB.ts;
+      }
+      return infoA.index - infoB.index;
+    }
+    return infoA.ts - infoB.ts;
+  });
+};
+
 export function AdminPortal({ onBack }: AdminPortalProps) {
   const [activeTab, setActiveTab] = useState<'accounts' | 'units'>('accounts');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -29,43 +55,45 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
   
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [units, setUnits] = useState<UnitKSM[]>([]);
+  const [searchUnitTerm, setSearchUnitTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const [accRes, unitRes] = await Promise.all([
-          fetchApi('users', 'GET'),
-          fetchApi('unit_ksm', 'GET')
-        ]);
-        
-        if (accRes.status === 'success' && Array.isArray(accRes.data)) {
-          setAccounts(accRes.data.map((d: any) => ({
-            id: String(d.id),
-            username: d.username,
-            name: d.nama_lengkap,
-            role: d.role
-          })));
-        }
-        
-        if (unitRes.status === 'success' && Array.isArray(unitRes.data)) {
-          setUnits(unitRes.data.map((d: any) => ({
-             id: String(d.id),
-             type: d.type,
-             name: d.nama
-          })));
-        }
-      } catch (err) {
-        console.error("Gagal memuat data admin:", err);
-      } finally {
-        setIsLoading(false);
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [accRes, unitRes] = await Promise.all([
+        fetchApi('users', 'GET'),
+        fetchApi('unit_ksm', 'GET')
+      ]);
+      
+      if (accRes.status === 'success' && Array.isArray(accRes.data)) {
+        setAccounts(accRes.data.map((d: any) => ({
+          id: String(d.id),
+          username: d.username,
+          name: d.nama_lengkap,
+          role: d.role
+        })));
       }
-    };
-    
-    loadData();
+      
+      if (unitRes.status === 'success' && Array.isArray(unitRes.data)) {
+        const rawUnits = unitRes.data.map((d: any) => ({
+           id: String(d.id),
+           type: d.type,
+           name: d.nama || d.name || ''
+        }));
+        setUnits(sortUnitsByImportOrder(rawUnits));
+      }
+    } catch (err) {
+      console.error("Gagal memuat data admin:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadData();
+    }
   }, [isAuthenticated]);
 
   // Account Form
@@ -73,6 +101,42 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   // Unit Form
   const [unitForm, setUnitForm] = useState({ type: 'KSM' as 'KSM' | 'Unit', name: '' });
+  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  // Custom confirmation and alert states
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'danger' | 'warning' | 'info';
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'info';
+    title: string;
+    message: string;
+  } | null>(null);
+
+  const showAlert = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setNotification({ isOpen: true, type, title, message });
+  };
+
+  const showConfirm = (options: {
+    title: string;
+    message: string;
+    type?: 'danger' | 'warning' | 'info';
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void | Promise<void>;
+  }) => {
+    setConfirmDialog({ isOpen: true, ...options });
+  };
 
   const handleSubmitAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +162,7 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
           } : acc));
           setEditingAccountId(null);
           setAccountForm({ username: '', name: '', role: 'Operator', password: '' });
-          alert("Data akun berhasil diupdate.");
+          showAlert("success", "Akun Diperbarui", "Data akun berhasil diupdate.");
         }
       } else {
         // Create Account
@@ -118,74 +182,354 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
             role: accountForm.role 
           }, ...accounts]);
           setAccountForm({ username: '', name: '', role: 'Operator', password: '' });
-          alert("Akun berhasil dibuat.");
+          showAlert("success", "Akun Dibuat", "Akun berhasil dibuat.");
         }
       }
     } catch (err) {
       console.error(err);
-      alert("Operasi gagal. Username mungkin sudah digunakan.");
+      showAlert("error", "Gagal", "Operasi gagal. Username mungkin sudah digunakan.");
     }
   };
 
-  const handleDeleteAccount = async (id: string) => {
-    if (!confirm("Hapus pengguna ini secara permanen?")) return;
-    try {
-      await fetchApi('users', 'DELETE', null, id);
-      setAccounts(accounts.filter(a => a.id !== id));
-    } catch (err) {
-      console.error(err);
-      alert("Gagal menghapus data akun.");
-    }
-  };
-
-  const handleResetPassword = async (id: string, username: string) => {
-    if (!confirm(`Generate password baru untuk akun @${username}?`)) return;
-    
-    const newPassword = Math.random().toString(36).slice(-6);
-    
-    try {
-      const res = await fetchApi('users', 'PUT', { password: newPassword }, id);
-      if (res.status === 'success') {
-        alert(`Password untuk @${username} berhasil direset!\n\nPassword Baru: ${newPassword}\n\nSebarkan password ini ke pengguna terkait.`);
-      } else {
-        alert(`Gagal mereset password: ${res.message}`);
+  const handleDeleteAccount = (id: string) => {
+    const acc = accounts.find(a => a.id === id);
+    const accName = acc ? acc.name : 'pengguna ini';
+    showConfirm({
+      title: "Hapus Akun Pengguna",
+      message: `Hapus akun "${accName}" secara permanen? Tindakan ini tidak dapat dibatalkan.`,
+      type: "danger",
+      confirmText: "Hapus Akun",
+      cancelText: "Batal",
+      onConfirm: async () => {
+        try {
+          await fetchApi('users', 'DELETE', null, id);
+          setAccounts(accounts.filter(a => a.id !== id));
+          showAlert("success", "Akun Dihapus", `Akun "${accName}" berhasil dihapus.`);
+        } catch (err) {
+          console.error(err);
+          showAlert("error", "Gagal", "Gagal menghapus data akun.");
+        }
       }
-    } catch (err) {
-      console.error(err);
-      alert("Terjadi kesalahan sistem saat mereset password.");
-    }
+    });
+  };
+
+  const handleResetPassword = (id: string, username: string) => {
+    showConfirm({
+      title: "Reset Password Akun",
+      message: `Apakah Anda yakin ingin generate password baru untuk akun @${username}?`,
+      type: "warning",
+      confirmText: "Generate Password",
+      cancelText: "Batal",
+      onConfirm: async () => {
+        const newPassword = Math.random().toString(36).slice(-6);
+        try {
+          const res = await fetchApi('users', 'PUT', { password: newPassword }, id);
+          if (res.status === 'success') {
+            showAlert("success", "Password Direset", `Password untuk @${username} berhasil direset!\n\nPassword Baru: ${newPassword}\n\nSebarkan password ini ke pengguna terkait.`);
+          } else {
+            showAlert("error", "Gagal Reset", `Gagal mereset password: ${res.message}`);
+          }
+        } catch (err) {
+          console.error(err);
+          showAlert("error", "Kesalahan Sistem", "Terjadi kesalahan sistem saat mereset password.");
+        }
+      }
+    });
   };
 
   const handleAddUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unitForm.name) return;
-    const newId = `unt_${Date.now()}`;
     
     try {
-      const res = await fetchApi('unit_ksm', 'POST', {
-        id: newId,
-        type: unitForm.type,
-        nama: unitForm.name
-      });
-      
-      if (res.status === 'success') {
-        setUnits([{ id: newId, type: unitForm.type, name: unitForm.name }, ...units]);
-        setUnitForm({ type: 'KSM', name: '' });
+      if (editingUnitId) {
+        // Update Unit/KSM
+        const res = await fetchApi('unit_ksm', 'PUT', {
+          type: unitForm.type,
+          name: unitForm.name
+        }, editingUnitId);
+        
+        if (res.status === 'success') {
+          const updated = units.map(u => u.id === editingUnitId ? { ...u, type: unitForm.type, name: unitForm.name } : u);
+          setUnits(sortUnitsByImportOrder(updated));
+          setEditingUnitId(null);
+          setUnitForm({ type: 'KSM', name: '' });
+          showAlert("success", `${unitForm.type} Diperbarui`, `Berhasil memperbarui data ${unitForm.type} menjadi "${unitForm.name}".`);
+        }
+      } else {
+        // Add new Unit/KSM
+        const newId = `unt_${Date.now()}`;
+        const res = await fetchApi('unit_ksm', 'POST', {
+          id: newId,
+          type: unitForm.type,
+          name: unitForm.name
+        });
+        
+        if (res.status === 'success') {
+          const updated = [{ id: newId, type: unitForm.type, name: unitForm.name }, ...units];
+          setUnits(sortUnitsByImportOrder(updated));
+          setUnitForm({ type: 'KSM', name: '' });
+          showAlert("success", `${unitForm.type} Berhasil Ditambahkan`, `Berhasil menyimpan data ${unitForm.type} "${unitForm.name}".`);
+        }
       }
     } catch (err) {
       console.error(err);
-      alert("Gagal menambahkan unit/KSM.");
+      showAlert("error", "Gagal", `Gagal menyimpan data ${unitForm.type}.`);
     }
   };
 
-  const handleDeleteUnit = async (id: string) => {
-    if (!confirm("Hapus Unit/KSM ini secara permanen?")) return;
+  const handleDeleteAllUnits = () => {
+    showConfirm({
+      title: "Hapus Semua Unit / KSM?",
+      message: `Apakah Anda yakin ingin menghapus seluruh ${units.length} Unit dan KSM dari sistem? Tindakan ini tidak dapat dibatalkan!`,
+      type: "danger",
+      confirmText: "Hapus Semua",
+      cancelText: "Batal",
+      onConfirm: () => {
+        showConfirm({
+          title: "Konfirmasi Terakhir",
+          message: "TINDAKAN INI SANGAT BERBAHAYA!\n\nSeluruh data Unit dan KSM akan dihapus dari database. Apakah Anda benar-benar yakin?",
+          type: "danger",
+          confirmText: "Ya, Hapus Semua!",
+          cancelText: "Batal",
+          onConfirm: async () => {
+            setIsLoading(true);
+            try {
+              // Deleting in moderate chunks of 5 is safe, fast, and does not lock cPanel databases
+              const chunks: UnitKSM[][] = [];
+              const chunkSize = 5;
+              for (let i = 0; i < units.length; i += chunkSize) {
+                chunks.push(units.slice(i, i + chunkSize));
+              }
+              
+              for (const chunk of chunks) {
+                await Promise.all(chunk.map(u => fetchApi('unit_ksm', 'DELETE', null, u.id)));
+              }
+              
+              setUnits([]);
+              showAlert("success", "Semua Data Dihapus", "Seluruh Unit & KSM berhasil dihapus dari sistem.");
+            } catch (err) {
+              console.error("Gagal menghapus semua unit:", err);
+              showAlert("error", "Gagal", "Beberapa atau semua data gagal dihapus. Silakan coba lagi.");
+              loadData();
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        });
+      }
+    });
+  };
+
+  const handleDeleteUnit = (id: string) => {
+    const unit = units.find(u => u.id === id);
+    const unitLabel = unit ? `${unit.type} "${unit.name}"` : 'Unit/KSM ini';
+    showConfirm({
+      title: "Hapus Unit / KSM",
+      message: `Hapus ${unitLabel} secara permanen? Tindakan ini tidak dapat dibatalkan.`,
+      type: "danger",
+      confirmText: "Hapus Permanen",
+      cancelText: "Batal",
+      onConfirm: async () => {
+        try {
+          await fetchApi('unit_ksm', 'DELETE', null, id);
+          setUnits(units.filter(u => u.id !== id));
+          showAlert("success", "Berhasil Dihapus", `${unitLabel} berhasil dihapus.`);
+        } catch (err) {
+          console.error(err);
+          showAlert("error", "Gagal", "Gagal menghapus data unit.");
+        }
+      }
+    });
+  };
+
+  const handleExportUnitsExcel = () => {
     try {
-      await fetchApi('unit_ksm', 'DELETE', null, id);
-      setUnits(units.filter(u => u.id !== id));
+      const rows = units.map((u, i) => ({
+        'No': i + 1,
+        'Tipe': u.type,
+        'Nama KSM / Unit': u.name
+      }));
+      
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      
+      const max_widths = [
+        { wch: 6 },
+        { wch: 15 },
+        { wch: 45 }
+      ];
+      ws['!cols'] = max_widths;
+      
+      XLSX.utils.book_append_sheet(wb, ws, "Unit & KSM");
+      XLSX.writeFile(wb, `Daftar_Unit_dan_KSM_RS_UNAIR.xlsx`);
+      showAlert("success", "Ekspor Berhasil", "Daftar unit dan KSM berhasil diekspor ke file Excel.");
     } catch (err) {
-      console.error(err);
-      alert("Gagal menghapus data unit.");
+      console.error("Gagal mengekspor data ke Excel:", err);
+      showAlert("error", "Gagal Ekspor", "Gagal melakukan ekspor data ke Excel.");
+    }
+  };
+
+  const processExcelFile = async (file: File) => {
+    if (!file) return;
+    if (isImporting) {
+      showAlert("info", "Sedang Berjalan", "Proses impor sebelumnya sedang berlangsung.");
+      return;
+    }
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) throw new Error("Gagal membaca file.");
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+        
+        if (!json || json.length === 0) {
+          showAlert("error", "Excel Kosong", "File Excel kosong atau tidak terbaca.");
+          setIsImporting(false);
+          return;
+        }
+        
+        const parsedUnits: { type: 'KSM' | 'Unit'; name: string }[] = [];
+        const seenInFile = new Set<string>();
+        
+        for (const row of json) {
+          const keys = Object.keys(row);
+          const typeKey = keys.find(k => /type|tipe|jenis/i.test(k));
+          const nameKey = keys.find(k => /name|nama/i.test(k));
+          
+          if (!nameKey) continue;
+          
+          const rawType = typeKey ? String(row[typeKey]).trim() : '';
+          const type: 'KSM' | 'Unit' = (/unit/i.test(rawType)) ? 'Unit' : 'KSM';
+          const name = String(row[nameKey]).trim();
+          
+          if (name) {
+            const fileKey = `${type}:${name.toLowerCase()}`;
+            if (!seenInFile.has(fileKey)) {
+              seenInFile.add(fileKey);
+              parsedUnits.push({ type, name });
+            }
+          }
+        }
+        
+        if (parsedUnits.length === 0) {
+          showAlert("error", "Format Tidak Sesuai", "Tidak ditemukan data unit/KSM yang valid. Pastikan Excel Anda memiliki kolom 'Tipe' dan 'Nama' (atau serupa).");
+          setIsImporting(false);
+          return;
+        }
+        
+        const ksmCount = parsedUnits.filter(u => u.type === 'KSM').length;
+        const unitCount = parsedUnits.filter(u => u.type === 'Unit').length;
+        
+        const confirmMsg = `Ditemukan ${ksmCount} KSM dan ${unitCount} Unit dari file Excel. Apakah Anda yakin ingin mengimpor data ini ke sistem?`;
+        
+        showConfirm({
+          title: "Konfirmasi Impor Massal",
+          message: confirmMsg,
+          type: "info",
+          confirmText: "Mulai Impor",
+          cancelText: "Batal",
+          onConfirm: async () => {
+            setIsImporting(true);
+            let successCount = 0;
+            let duplicateCount = 0;
+            let failCount = 0;
+            
+            // Fetch live list of units from the server to guarantee fresh duplicate check matching
+            let currentUnits = [...units];
+            try {
+              const unitRes = await fetchApi('unit_ksm');
+              if (unitRes.status === 'success' && Array.isArray(unitRes.data)) {
+                currentUnits = unitRes.data.map((d: any) => ({
+                  id: String(d.id),
+                  type: d.type,
+                  name: d.nama
+                }));
+              }
+            } catch (err) {
+              console.warn("Could not reload units to check duplicate, falling back to local state:", err);
+            }
+
+            const importedKeysInThisSession = new Set<string>();
+            
+            for (let i = 0; i < parsedUnits.length; i++) {
+              const item = parsedUnits[i];
+              const nameLower = item.name.toLowerCase();
+              const lookupKey = `${item.type}:${nameLower}`;
+              
+              // Prevent duplicates against both database state AND duplicate rows processed within this imports batch
+              const isDuplicateInDb = currentUnits.some(u => u.name.toLowerCase() === nameLower && u.type === item.type);
+              const isDuplicateInBatch = importedKeysInThisSession.has(lookupKey);
+              
+              if (isDuplicateInDb || isDuplicateInBatch) {
+                duplicateCount++;
+                continue;
+              }
+              
+              // Generate highly randomized, unique identifiers in milliseconds increment
+              const newId = `unt_${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}`;
+              
+              try {
+                const res = await fetchApi('unit_ksm', 'POST', {
+                  id: newId,
+                  type: item.type,
+                  name: item.name
+                });
+                if (res.status === 'success') {
+                  successCount++;
+                  importedKeysInThisSession.add(lookupKey);
+                  currentUnits.push({ id: newId, type: item.type, name: item.name });
+                } else {
+                  failCount++;
+                }
+              } catch (err) {
+                console.error("Gagal mengimpor unit:", item.name, err);
+                failCount++;
+              }
+            }
+            
+            setIsImporting(false);
+            showAlert("success", "Impor Selesai", `Impor data Excel selesai!\n\n- Berhasil diimpor: ${successCount} data\n- Dilewati (data ganda): ${duplicateCount} data\n- Gagal: ${failCount} data`);
+            await loadData();
+          }
+        });
+      } catch (err) {
+        console.error("Gagal memproses berkas Excel:", err);
+        showAlert("error", "Error", "Gagal memproses file Excel.");
+      } finally {
+        setIsImporting(false);
+      }
+    };
+    
+    reader.readAsBinaryString(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      processExcelFile(e.target.files[0]);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processExcelFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -265,6 +609,11 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
       </div>
     );
   }
+
+  const filteredUnits = units.filter(unit => 
+    unit.name.toLowerCase().includes(searchUnitTerm.toLowerCase()) || 
+    unit.id.toLowerCase().includes(searchUnitTerm.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans p-6">
@@ -397,58 +746,169 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
             )}
 
             {activeTab === 'units' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-[32px] p-8 shadow-xl shadow-slate-200/50 border border-slate-100"
-              >
-                <div className="flex items-center gap-3 mb-8 text-slate-800">
-                  <div className="w-10 h-10 rounded-2xl bg-unair-gold/10 flex items-center justify-center text-unair-gold">
-                    <Building className="w-5 h-5" />
-                  </div>
-                  <h2 className="text-lg font-black tracking-tight uppercase">Tambah Unit / KSM</h2>
-                </div>
-                
-                <form onSubmit={handleAddUnit} className="space-y-5">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Jenis</label>
-                    <div className="flex bg-slate-50 p-1.5 border border-slate-200 rounded-2xl">
-                      <button 
-                        type="button"
-                        onClick={() => setUnitForm({...unitForm, type: 'KSM'})}
-                        className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${unitForm.type === 'KSM' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}
-                      >
-                        KSM
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setUnitForm({...unitForm, type: 'Unit'})}
-                        className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${unitForm.type === 'Unit' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}
-                      >
-                        UNIT STRUKTURAL
-                      </button>
+              <div className="space-y-6">
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white rounded-[32px] p-8 shadow-xl shadow-slate-200/50 border border-slate-100"
+                >
+                  <div className="flex items-center gap-3 mb-8 text-slate-800">
+                    <div className="w-10 h-10 rounded-2xl bg-unair-gold/10 flex items-center justify-center text-unair-gold">
+                      <Building className="w-5 h-5" />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Nama {unitForm.type}</label>
-                    <input 
-                      type="text" 
-                      value={unitForm.name}
-                      onChange={e => setUnitForm({...unitForm, name: e.target.value})}
-                      required
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-unair-gold/10 focus:border-unair-gold outline-none transition-all"
-                      placeholder={`Contoh: ${unitForm.type === 'KSM' ? 'Bedah Orthopedi' : 'Pendidikan & Pelatihan'}...`}
-                    />
+                    <h2 className="text-lg font-black tracking-tight uppercase">
+                      {editingUnitId ? 'Edit Unit / KSM' : 'Tambah Unit / KSM'}
+                    </h2>
                   </div>
                   
-                  <button type="submit" className="w-full pt-2 flex">
-                    <div className="w-full bg-slate-900 text-white rounded-2xl py-4 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors cursor-pointer">
-                      <Plus className="w-4 h-4" />
-                      Simpan {unitForm.type}
+                  <form onSubmit={handleAddUnit} className="space-y-5">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Jenis</label>
+                      <div className="flex bg-slate-50 p-1.5 border border-slate-200 rounded-2xl">
+                        <button 
+                          type="button"
+                          onClick={() => setUnitForm({...unitForm, type: 'KSM'})}
+                          className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${unitForm.type === 'KSM' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                          KSM
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setUnitForm({...unitForm, type: 'Unit'})}
+                          className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${unitForm.type === 'Unit' ? 'bg-white shadow-sm text-slate-900 border border-slate-200/50' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                          UNIT STRUKTURAL
+                        </button>
+                      </div>
                     </div>
-                  </button>
-                </form>
-              </motion.div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Nama {unitForm.type}</label>
+                      <input 
+                        type="text" 
+                        value={unitForm.name}
+                        onChange={e => setUnitForm({...unitForm, name: e.target.value})}
+                        required
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-unair-gold/10 focus:border-unair-gold outline-none transition-all"
+                        placeholder={`Contoh: ${unitForm.type === 'KSM' ? 'Bedah Orthopedi' : 'Pendidikan & Pelatihan'}...`}
+                      />
+                    </div>
+                    
+                    <button type="submit" className="w-full pt-2 flex">
+                      <div className="w-full bg-slate-900 text-white rounded-2xl py-4 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors cursor-pointer">
+                        {editingUnitId ? <Edit className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                        {editingUnitId ? `Update ${unitForm.type}` : `Simpan ${unitForm.type}`}
+                      </div>
+                    </button>
+                    {editingUnitId && (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setEditingUnitId(null);
+                          setUnitForm({ type: 'KSM', name: '' });
+                        }}
+                        className="w-full text-center text-slate-400 text-[10px] font-black uppercase tracking-widest mt-4 hover:text-slate-600 transition-colors cursor-pointer"
+                      >
+                        Batal Edit
+                      </button>
+                    )}
+                  </form>
+                </motion.div>
+
+                {/* Integration Card */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="bg-white rounded-[32px] p-8 shadow-xl shadow-slate-200/50 border border-slate-100"
+                >
+                  <div className="flex items-center gap-3 mb-6 text-slate-800">
+                    <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-md font-black tracking-tight uppercase leading-none mb-1">Integrasi Excel</h2>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ekspor & Impor Massal</p>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                    Unduh daftar Unit/KSM saat ini sebagai file Excel, atau unggah Excel baru untuk melakukan impor massal secara instan.
+                  </p>
+
+                  <div className="space-y-4">
+                    {/* Export */}
+                    <button 
+                      onClick={handleExportUnitsExcel}
+                      disabled={isImporting}
+                      className="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl py-3.5 px-4 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 text-slate-700 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4" />
+                      Ekspor ke Excel (.xlsx)
+                    </button>
+
+                    {/* Divider */}
+                    <div className="flex items-center my-4">
+                      <div className="flex-1 border-t border-slate-100"></div>
+                      <span className="px-3 text-[10px] font-bold text-slate-300 uppercase tracking-widest">ATAU IMPOR</span>
+                      <div className="flex-1 border-t border-slate-100"></div>
+                    </div>
+
+                    {/* Import Dropzone / Button */}
+                    <div 
+                      onDragEnter={handleDrag}
+                      onDragOver={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDrop={handleDrop}
+                      className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
+                        dragActive 
+                          ? 'border-unair-gold bg-unair-gold/5' 
+                          : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input 
+                        type="file" 
+                        id="excel-import-units" 
+                        accept=".xlsx, .xls"
+                        onChange={handleFileChange}
+                        disabled={isImporting}
+                        className="hidden" 
+                      />
+                      <label 
+                        htmlFor="excel-import-units"
+                        className="flex flex-col items-center justify-center gap-2.5 cursor-pointer"
+                      >
+                        {isImporting ? (
+                          <>
+                            <Loader2 className="w-6 h-6 text-unair-gold animate-spin" />
+                            <div>
+                              <p className="text-xs font-bold text-slate-700">Sedang mengimpor data...</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Harap tunggu sejenak</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-6 h-6 text-slate-400" />
+                            <div>
+                              <p className="text-xs font-bold text-slate-700">
+                                Seret & letakkan file atau <span className="text-unair-blue underline">pilih file</span>
+                              </p>
+                              <p className="text-[10px] text-slate-400 mt-1">
+                                Format: .xlsx atau .xls
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </label>
+                    </div>
+
+                    {/* Template Tip */}
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/50 text-[11px] text-slate-500 leading-relaxed">
+                      <span className="font-bold text-slate-700 block mb-1">Struktur Kolom Excel:</span>
+                      Harus memiliki kolom <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono text-xs font-bold text-slate-700">Tipe</code> (nilai: <code className="font-semibold text-slate-600">Unit</code> atau <code className="font-semibold text-slate-600">KSM</code>) & <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 font-mono text-xs font-bold text-slate-700">Nama</code>.
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
             )}
           </div>
 
@@ -459,9 +919,21 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
                 <h3 className="font-black text-slate-800 uppercase tracking-tight">
                   {activeTab === 'accounts' ? 'Daftar Akun Sistem' : 'Daftar Unit & KSM'}
                 </h3>
-                <span className="text-xs font-bold text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-200">
-                  Total {activeTab === 'accounts' ? accounts.length : units.length} Data
-                </span>
+                <div className="flex items-center gap-3">
+                  {activeTab === 'units' && units.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteAllUnits}
+                      className="text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Hapus Semua
+                    </button>
+                  )}
+                  <span className="text-xs font-bold text-slate-400 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
+                    Total {activeTab === 'accounts' ? accounts.length : units.length} Data
+                  </span>
+                </div>
               </div>
               
               <div className="p-8 flex-1 overflow-y-auto">
@@ -521,27 +993,69 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
                     )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {units.map(unit => (
-                       <div key={unit.id} className="flex flex-col p-5 rounded-2xl border border-slate-100 hover:border-unair-gold/30 hover:bg-slate-50 transition-colors group">
-                         <div className="flex justify-between items-start mb-4">
-                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${unit.type === 'KSM' ? 'bg-unair-blue/10 text-unair-blue' : 'bg-unair-gold/10 text-unair-gold-dark'}`}>
-                              {unit.type}
-                            </span>
+                  <div className="space-y-6">
+                    {/* Search Bar */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-slate-400" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Cari Unit / KSM..."
+                        value={searchUnitTerm}
+                        onChange={(e) => setSearchUnitTerm(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-unair-blue/10 focus:border-unair-blue outline-none transition-all"
+                      />
+                    </div>
+                  
+                    <div className="space-y-4">
+                      {filteredUnits.map(unit => (
+                        <div key={unit.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-unair-gold/30 hover:bg-slate-50 transition-colors group">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg uppercase">
+                              <Building className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-800 flex items-center gap-2">
+                                {unit.name}
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${unit.type === 'KSM' ? 'bg-unair-blue/10 text-unair-blue' : 'bg-unair-gold/10 text-unair-gold-dark'}`}>
+                                  {unit.type}
+                                </span>
+                              </div>
+                              <div className="text-xs text-slate-400 font-medium mt-1">ID: {unit.id}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
                             <button 
+                              title="Edit Unit/KSM"
+                              onClick={() => {
+                                setEditingUnitId(unit.id);
+                                setUnitForm({
+                                  type: unit.type,
+                                  name: unit.name
+                                });
+                              }}
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-unair-blue hover:bg-unair-blue/10 transition-colors cursor-pointer"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button 
+                              title="Hapus Unit/KSM"
                               onClick={() => handleDeleteUnit(unit.id)}
-                              className="text-slate-300 hover:text-rose-500 transition-colors cursor-pointer"
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
-                         </div>
-                         <h4 className="font-bold text-slate-800 text-lg mb-1">{unit.name}</h4>
-                         <p className="text-xs text-slate-400 font-medium mt-auto">ID: {unit.id}</p>
-                       </div>
-                    ))}
-                    {units.length === 0 && (
-                      <div className="col-span-2 text-center py-12 text-slate-400 font-medium text-sm">Belum ada data unit/KSM.</div>
-                    )}
+                          </div>
+                        </div>
+                      ))}
+                      {filteredUnits.length === 0 && (
+                        <div className="text-center py-12 text-slate-400 font-medium text-sm">
+                          {units.length > 0 ? 'Pencarian tidak ditemukan.' : 'Belum ada data unit/KSM.'}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -550,6 +1064,117 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
           
         </div>
       </div>
+
+      {/* Custom Confirmation Dialog Modal */}
+      {confirmDialog?.isOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            onClick={() => setConfirmDialog(null)}
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative bg-white rounded-[32px] p-8 shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden"
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className={`w-16 h-16 rounded-3xl flex items-center justify-center mb-6 ${
+                confirmDialog.type === 'danger' 
+                  ? 'bg-rose-50 text-rose-500' 
+                  : confirmDialog.type === 'warning'
+                    ? 'bg-amber-50 text-amber-500'
+                    : 'bg-unair-blue/10 text-unair-blue'
+              }`}>
+                {confirmDialog.type === 'danger' && <Trash2 className="w-8 h-8" />}
+                {confirmDialog.type === 'warning' && <AlertTriangle className="w-8 h-8" />}
+                {(confirmDialog.type === 'info' || !confirmDialog.type) && <HelpCircle className="w-8 h-8" />}
+              </div>
+              
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-3">
+                {confirmDialog.title}
+              </h3>
+              <p className="text-slate-500 text-sm font-medium leading-relaxed mb-8 whitespace-pre-line">
+                {confirmDialog.message}
+              </p>
+              
+              <div className="flex gap-4 w-full">
+                <button 
+                  type="button"
+                  onClick={() => setConfirmDialog(null)}
+                  className="flex-1 py-4 px-6 bg-slate-50 hover:bg-slate-100 text-slate-500 font-bold rounded-2xl text-xs uppercase tracking-widest transition-colors cursor-pointer border border-slate-200/50"
+                >
+                  {confirmDialog.cancelText || 'Batal'}
+                </button>
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    const onConfirmCallback = confirmDialog.onConfirm;
+                    setConfirmDialog(null);
+                    await onConfirmCallback();
+                  }}
+                  className={`flex-1 py-4 px-6 text-white font-bold rounded-2xl text-xs uppercase tracking-widest transition-colors cursor-pointer shadow-lg ${
+                    confirmDialog.type === 'danger' 
+                      ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-200' 
+                      : confirmDialog.type === 'warning'
+                        ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-200'
+                        : 'bg-slate-900 hover:bg-slate-800 shadow-slate-200'
+                  }`}
+                >
+                  {confirmDialog.confirmText || 'Ya, Lanjutkan'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Custom Alert Notification Modal */}
+      {notification?.isOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            onClick={() => setNotification(null)}
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative bg-white rounded-[32px] p-8 shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden"
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className={`w-16 h-16 rounded-3xl flex items-center justify-center mb-6 ${
+                notification.type === 'success' 
+                  ? 'bg-emerald-50 text-emerald-500' 
+                  : notification.type === 'error'
+                    ? 'bg-rose-50 text-rose-500'
+                    : 'bg-unair-blue/10 text-unair-blue'
+              }`}>
+                {notification.type === 'success' && <CheckCircle2 className="w-8 h-8" />}
+                {notification.type === 'error' && <XCircle className="w-8 h-8" />}
+                {notification.type === 'info' && <AlertTriangle className="w-8 h-8" />}
+              </div>
+              
+              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-3">
+                {notification.title}
+              </h3>
+              <p className="text-slate-500 text-sm font-medium leading-relaxed mb-8 whitespace-pre-line">
+                {notification.message}
+              </p>
+              
+              <button 
+                type="button"
+                onClick={() => setNotification(null)}
+                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl text-xs uppercase tracking-widest transition-colors cursor-pointer shadow-lg shadow-slate-200"
+              >
+                Tutup
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

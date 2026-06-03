@@ -261,7 +261,7 @@ export function DashboardSummary({ onNavigate }: DashboardSummaryProps) {
     },
     {
       id: 'pelatihan_kerjasama' as TabType,
-      title: 'Kerjasama SKP',
+      title: 'kegiatan Kerjasama ber-SKP',
       count: kerjasamaSkpRecords.length,
       unit: 'MoU',
       icon: Building2,
@@ -313,7 +313,7 @@ export function DashboardSummary({ onNavigate }: DashboardSummaryProps) {
     },
     {
       id: 'pelatihan_kemenkes' as TabType,
-      title: 'Standar Kemenkes',
+      title: 'Kurikulum Kemenkes',
       count: standarKemenkesRecords.length,
       unit: 'Pelatihan',
       icon: ShieldAlert,
@@ -321,12 +321,12 @@ export function DashboardSummary({ onNavigate }: DashboardSummaryProps) {
       tag: 'Akreditasi Kurikulum Kemenkes',
       records: standarKemenkesRecords,
       fields: ['judulPelatihan'],
-      labels: ['Judul Pelatihan Standar Kemenkes'],
+      labels: ['Judul Kurikulum Kemenkes'],
       chartField: 'judulPelatihan',
     },
     {
       id: 'pelatihan_internasional' as TabType,
-      title: 'Pelatihan Internasional',
+      title: 'Kegiatan Internasional',
       count: pelatihanInternasionalRecords.length,
       unit: 'Event',
       icon: Globe,
@@ -352,7 +352,7 @@ export function DashboardSummary({ onNavigate }: DashboardSummaryProps) {
     },
     {
       id: 'pelatihan_mandiri' as TabType,
-      title: 'Pelatihan Mandiri',
+      title: 'Kegiatan Mandiri ber SKP',
       count: pelatihanMandiriRecords.length,
       unit: 'Kegiatan',
       icon: Plus,

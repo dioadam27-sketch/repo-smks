@@ -1201,7 +1201,7 @@ export function generateMonitoringJamPdf(records: any[]) {
 // 8e. Kerjasama SKP
 export function generateKerjasamaSkpPdf(records: KerjasamaSkpRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
-    'Kegiatan Pelatihan Ber-SKP',
+    'kegiatan Kerjasama ber-SKP',
     'Program Kerjasama Sertifikasi'
   );
 
@@ -1234,7 +1234,7 @@ export function generateKerjasamaSkpPdf(records: KerjasamaSkpRecord[]) {
     }
   });
 
-  finalizePdfPages(doc, 'Kerjasama_SKP', false, addHeaderFooter);
+  finalizePdfPages(doc, 'kegiatan_Kerjasama_ber_SKP', false, addHeaderFooter);
 }
 
 // 8f. Studi Banding
@@ -1401,8 +1401,8 @@ export function generateTrainerSertifikasiPdf(records: TrainerSertifikasiRecord[
 
 export function generatePelatihanMandiriPdf(records: any[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
-    'Pelatihan Mandiri ber-SKP',
-    'Sub-Menu Pelatihan Mandiri ber-SKP RS UNAIR'
+    'Kegiatan Mandiri ber SKP',
+    'Sub-Menu Kegiatan Mandiri ber SKP RS UNAIR'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1440,7 +1440,7 @@ export function generatePelatihanMandiriPdf(records: any[]) {
     }
   });
 
-  finalizePdfPages(doc, 'Pelatihan_Mandiri', false, addHeaderFooter);
+  finalizePdfPages(doc, 'Kegiatan_Mandiri_ber_SKP', false, addHeaderFooter);
 }
 
 // 9. Penelitian

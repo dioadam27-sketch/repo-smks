@@ -678,8 +678,14 @@ const mapKerjasamaSkpToDb = (rec: any) => ({
   tanggal_kegiatan: rec.tanggalKegiatan,
   lembaga_kerjasama: rec.lembagaKerjasama,
   pks: rec.pks,
+  pks_name: rec.pksName,
+  pks_drive_url: rec.pksDriveUrl,
   berkas_pendukung: rec.berkasPendukung,
+  berkas_pendukung_name: rec.berkasPendukungName,
+  berkas_pendukung_drive_url: rec.berkasPendukungDriveUrl,
   laporan_pengendali: rec.laporanPengendali,
+  laporan_pengendali_name: rec.laporanPengendaliName,
+  laporan_pengendali_drive_url: rec.laporanPengendaliDriveUrl,
   total_pendapatan: Number(rec.totalPendapatan || 0)
 });
 const mapKerjasamaSkpFromDb = (row: any): KerjasamaSkpRecord => ({
@@ -688,8 +694,14 @@ const mapKerjasamaSkpFromDb = (row: any): KerjasamaSkpRecord => ({
   tanggalKegiatan: row.tanggal_kegiatan || '',
   lembagaKerjasama: row.lembaga_kerjasama || '',
   pks: row.pks || '',
+  pksName: row.pks_name || '',
+  pksDriveUrl: row.pks_drive_url || '',
   berkasPendukung: row.berkas_pendukung || '',
+  berkasPendukungName: row.berkas_pendukung_name || '',
+  berkasPendukungDriveUrl: row.berkas_pendukung_drive_url || '',
   laporanPengendali: row.laporan_pengendali || '',
+  laporanPengendaliName: row.laporan_pengendali_name || '',
+  laporanPengendaliDriveUrl: row.laporan_pengendali_drive_url || '',
   totalPendapatan: Number(row.total_pendapatan || 0)
 });
 
@@ -1793,8 +1805,12 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setRecords(mapped);
               localStorage.setItem(fallbackKey, JSON.stringify(mapped));
             }
-          } catch (e) {
-            console.error(`Gagal sinkronisasi data dari DB untuk resource ${resource}, menggunakan cache lokal.`, e);
+          } catch (e: any) {
+            if (e && e.message && e.message.includes("Sesi telah habis")) {
+              console.warn(`Sesi sinkronisasi DB ditangguhkan untuk resource ${resource}. Pengguna offline atau sesi habis.`);
+            } else {
+              console.error(`Gagal sinkronisasi data dari DB untuk resource ${resource}, menggunakan cache lokal.`, e);
+            }
           }
         };
 
@@ -1811,14 +1827,14 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
           fetchAndSet('pelatihan_unggulan', mapPelatihanUnggulanFromDb, setPelatihanUnggulanRecords, 'smks_pelatihan_unggulan'),
           fetchAndSet('inhouse_training', mapInhouseTrainingFromDb, setInhouseTrainingRecords, 'smks_inhouse_training'),
           fetchAndSet('monitoring_jam', mapMonitoringJamFromDb, setMonitoringJamRecords, 'smks_monitoring_jam'),
-          fetchAndSet('kerjasama_skp', mapKerjasamaSkpFromDb, setKerjasamaSkpRecords, 'smks_kerjasama_skp'),
+          fetchAndSet('kegiatan_kerjasama_skp', mapKerjasamaSkpFromDb, setKerjasamaSkpRecords, 'smks_kerjasama_skp'),
           fetchAndSet('studi_banding', mapStudiBandingFromDb, setStudiBandingRecords, 'smks_studi_banding'),
           fetchAndSet('dokter_observer', mapDokterObserverFromDb, setDokterObserverRecords, 'smks_dokter_observer'),
           fetchAndSet('magang', mapMagangFromDb, setMagangRecords, 'smks_magang'),
-          fetchAndSet('pelatihan_standar_kemenkes', mapStandarKemenkesFromDb, setStandarKemenkesRecords, 'smks_standar_kemenkes'),
-          fetchAndSet('pelatihan_internasional', mapPelatihanInternasionalFromDb, setPelatihanInternasionalRecords, 'smks_pelatihan_internasional'),
+          fetchAndSet('kurikulum_kemenkes', mapStandarKemenkesFromDb, setStandarKemenkesRecords, 'smks_standar_kemenkes'),
+          fetchAndSet('kegiatan_internasional', mapPelatihanInternasionalFromDb, setPelatihanInternasionalRecords, 'smks_pelatihan_internasional'),
           fetchAndSet('trainer_sertifikasi', mapTrainerSertifikasiFromDb, setTrainerSertifikasiRecords, 'smks_trainer_sertifikasi'),
-          fetchAndSet('pelatihan_mandiri', mapPelatihanMandiriFromDb, setPelatihanMandiriRecords, 'smks_pelatihan_mandiri'),
+          fetchAndSet('kegiatan_mandiri_skp', mapPelatihanMandiriFromDb, setPelatihanMandiriRecords, 'smks_pelatihan_mandiri'),
           
           fetchAndSet('penelitian', mapPenelitianFromDb, setPenelitianRecords, 'smks_penelitian'),
           fetchAndSet('pendapatan_penelitian', mapPendapatanPenelitianFromDb, setPendapatanPenelitianRecords, 'smks_pendapatan_penelitian'),
@@ -2068,15 +2084,15 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addKerjasamaSkp = (rec: Omit<KerjasamaSkpRecord, 'id'>) => {
     const newRecord = { ...rec, id: generateId('ks') };
     setKerjasamaSkpRecords(prev => [newRecord, ...prev]);
-    apiSave('kerjasama_skp', 'POST', mapKerjasamaSkpToDb(newRecord));
+    apiSave('kegiatan_kerjasama_skp', 'POST', mapKerjasamaSkpToDb(newRecord));
   };
   const updateKerjasamaSkp = (rec: KerjasamaSkpRecord) => {
     setKerjasamaSkpRecords(prev => prev.map(r => r.id === rec.id ? rec : r));
-    apiSave('kerjasama_skp', 'PUT', mapKerjasamaSkpToDb(rec), rec.id);
+    apiSave('kegiatan_kerjasama_skp', 'PUT', mapKerjasamaSkpToDb(rec), rec.id);
   };
   const deleteKerjasamaSkp = (id: string) => {
     setKerjasamaSkpRecords(prev => prev.filter(r => r.id !== id));
-    apiSave('kerjasama_skp', 'DELETE', undefined, id);
+    apiSave('kegiatan_kerjasama_skp', 'DELETE', undefined, id);
   };
 
   const addStudiBanding = (rec: Omit<StudiBandingRecord, 'id'>) => {
@@ -2124,29 +2140,29 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addStandarKemenkes = (rec: Omit<StandarKemenkesRecord, 'id'>) => {
     const newRecord = { ...rec, id: generateId('stk') };
     setStandarKemenkesRecords(prev => [newRecord, ...prev]);
-    apiSave('pelatihan_standar_kemenkes', 'POST', mapStandarKemenkesToDb(newRecord));
+    apiSave('kurikulum_kemenkes', 'POST', mapStandarKemenkesToDb(newRecord));
   };
   const updateStandarKemenkes = (rec: StandarKemenkesRecord) => {
     setStandarKemenkesRecords(prev => prev.map(r => r.id === rec.id ? rec : r));
-    apiSave('pelatihan_standar_kemenkes', 'PUT', mapStandarKemenkesToDb(rec), rec.id);
+    apiSave('kurikulum_kemenkes', 'PUT', mapStandarKemenkesToDb(rec), rec.id);
   };
   const deleteStandarKemenkes = (id: string) => {
     setStandarKemenkesRecords(prev => prev.filter(r => r.id !== id));
-    apiSave('pelatihan_standar_kemenkes', 'DELETE', undefined, id);
+    apiSave('kurikulum_kemenkes', 'DELETE', undefined, id);
   };
 
   const addPelatihanInternasional = (rec: Omit<PelatihanInternasionalRecord, 'id'>) => {
     const newRecord = { ...rec, id: generateId('pint') };
     setPelatihanInternasionalRecords(prev => [newRecord, ...prev]);
-    apiSave('pelatihan_internasional', 'POST', mapPelatihanInternasionalToDb(newRecord));
+    apiSave('kegiatan_internasional', 'POST', mapPelatihanInternasionalToDb(newRecord));
   };
   const updatePelatihanInternasional = (rec: PelatihanInternasionalRecord) => {
     setPelatihanInternasionalRecords(prev => prev.map(r => r.id === rec.id ? rec : r));
-    apiSave('pelatihan_internasional', 'PUT', mapPelatihanInternasionalToDb(rec), rec.id);
+    apiSave('kegiatan_internasional', 'PUT', mapPelatihanInternasionalToDb(rec), rec.id);
   };
   const deletePelatihanInternasional = (id: string) => {
     setPelatihanInternasionalRecords(prev => prev.filter(r => r.id !== id));
-    apiSave('pelatihan_internasional', 'DELETE', undefined, id);
+    apiSave('kegiatan_internasional', 'DELETE', undefined, id);
   };
 
   const addTrainerSertifikasi = (rec: Omit<TrainerSertifikasiRecord, 'id'>) => {
@@ -2166,15 +2182,15 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addPelatihanMandiri = (rec: Omit<PelatihanMandiriRecord, 'id'>) => {
     const newRecord = { ...rec, id: generateId('pmand') };
     setPelatihanMandiriRecords(prev => [newRecord, ...prev]);
-    apiSave('pelatihan_mandiri', 'POST', mapPelatihanMandiriToDb(newRecord));
+    apiSave('kegiatan_mandiri_skp', 'POST', mapPelatihanMandiriToDb(newRecord));
   };
   const updatePelatihanMandiri = (rec: PelatihanMandiriRecord) => {
     setPelatihanMandiriRecords(prev => prev.map(r => r.id === rec.id ? rec : r));
-    apiSave('pelatihan_mandiri', 'PUT', mapPelatihanMandiriToDb(rec), rec.id);
+    apiSave('kegiatan_mandiri_skp', 'PUT', mapPelatihanMandiriToDb(rec), rec.id);
   };
   const deletePelatihanMandiri = (id: string) => {
     setPelatihanMandiriRecords(prev => prev.filter(r => r.id !== id));
-    apiSave('pelatihan_mandiri', 'DELETE', undefined, id);
+    apiSave('kegiatan_mandiri_skp', 'DELETE', undefined, id);
   };
 
   const addPendapatanPenelitian = (rec: Omit<PendapatanPenelitianRecord, 'id'>) => {

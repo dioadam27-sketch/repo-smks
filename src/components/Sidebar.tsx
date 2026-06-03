@@ -98,14 +98,14 @@ export function Sidebar({ activeTab, setActiveTab, viewMode }: SidebarProps) {
   ] as const;
 
   const trainSubItems = [
-    { id: 'pelatihan_inhouse', label: 'Inhouse Training', icon: Activity },
-    { id: 'pelatihan_kerjasama', label: 'Kerjasama SKP', icon: Handshake },
-    { id: 'pelatihan_studi', label: 'Studi Banding', icon: Plane },
-    { id: 'pelatihan_magang', label: 'Magang', icon: Briefcase },
-    { id: 'pelatihan_standar_kemenkes', label: 'Pelatihan Standar Kemenkes', icon: FileText },
-    { id: 'pelatihan_internasional', label: 'Kerjasama Pelatihan Internasional', icon: Globe },
     { id: 'pelatihan_trainer_sertifikasi', label: 'Trainer Tersertifikasi', icon: UserCheck },
-    { id: 'pelatihan_mandiri', label: 'Pelatihan Mandiri ber-SKP', icon: Award },
+    { id: 'pelatihan_internasional', label: 'Kegiatan Internasional', icon: Globe },
+    { id: 'pelatihan_standar_kemenkes', label: 'Kurikulum Kemenkes', icon: FileText },
+    { id: 'pelatihan_mandiri', label: 'Kegiatan Mandiri ber SKP', icon: Award },
+    { id: 'pelatihan_kerjasama', label: 'kegiatan Kerjasama ber-SKP', icon: Handshake },
+    { id: 'pelatihan_inhouse', label: 'Inhouse Training', icon: Activity },
+    { id: 'pelatihan_magang', label: 'Magang', icon: Briefcase },
+    { id: 'pelatihan_studi', label: 'Studi Banding', icon: Plane },
   ] as const;
 
   const inovSubItems = [
@@ -136,7 +136,7 @@ export function Sidebar({ activeTab, setActiveTab, viewMode }: SidebarProps) {
     } else if (itemId === 'pelatihan') {
       if (!isPelatihanActive) {
         setTrainExpanded(true);
-        setActiveTab('pelatihan_inhouse');
+        setActiveTab('pelatihan_trainer_sertifikasi');
       } else {
         setTrainExpanded(!trainExpanded);
       }

@@ -8,6 +8,7 @@ import {
   Eye, Download, Printer, ExternalLink, Globe, Clock, UserCheck
 } from 'lucide-react';
 import { useSMKS } from '../context/SMKSContext';
+import { fetchApi } from '../lib/api';
 import { 
   formatPelatihanExcel, 
   downloadExcelSheet,
@@ -261,6 +262,17 @@ function SearchableSelect({ options, value, onChange, placeholder = "Pilih..." }
   );
 }
 
+const TARGET_MAP: { [key: string]: { target: number, unit: string } } = {
+  "Trainer Tersertifikasi": { target: 5, unit: "orang" },
+  "Kegiatan Internasional": { target: 3, unit: "kegiatan" },
+  "Kurikulum Kemenkes": { target: 15, unit: "kurikulum" },
+  "Kegiatan Mandiri ber SKP": { target: 15, unit: "kegiatan" },
+  "kegiatan Kerjasama ber-SKP": { target: 25, unit: "kegiatan" },
+  "Inhouse Training": { target: 73, unit: "kegiatan" },
+  "Magang": { target: 10, unit: "orang" },
+  "Studi Banding": { target: 6, unit: "kegiatan" }
+};
+
 export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
   const { 
     dashboardStats, 
@@ -287,6 +299,87 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
   const [editTarget, setEditTarget] = useState<{id: string, type: PelatihanSubMenu, data: any} | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [isUploadingEdit, setIsUploadingEdit] = useState<{[key: string]: boolean}>({});
+
+  const [dbUnits, setDbUnits] = useState<{ id: string; type: 'Unit' | 'KSM'; name: string }[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    const sortUnitsByImportOrder = (unitsList: { id: string; type: 'Unit' | 'KSM'; name: string }[]) => {
+      return [...unitsList].sort((a, b) => {
+        const parseIdSuffix = (id: string) => {
+          const parts = id.split('_');
+          if (parts.length >= 3) {
+            const idxPart = parts.length >= 4 ? parts[2] : parts[parts.length - 1];
+            const idx = parseInt(idxPart, 10);
+            if (!isNaN(idx)) return { isImported: true, index: idx, ts: parseInt(parts[1], 10) || 0 };
+          }
+          return { isImported: false, index: 0, ts: parseInt(parts[1], 10) || parseInt(id.replace(/\D/g, ''), 10) || 0 };
+        };
+
+        const infoA = parseIdSuffix(a.id);
+        const infoB = parseIdSuffix(b.id);
+
+        if (infoA.isImported && infoB.isImported) {
+          if (infoA.ts !== infoB.ts) {
+            return infoA.ts - infoB.ts;
+          }
+          return infoA.index - infoB.index;
+        }
+        return infoA.ts - infoB.ts;
+      });
+    };
+
+    const fetchUnits = async () => {
+      try {
+        const res = await fetchApi('unit_ksm');
+        if (res.status === 'success' && Array.isArray(res.data) && active) {
+          const mapped = res.data.map((item: any) => ({
+            id: String(item.id),
+            type: item.type as 'Unit' | 'KSM',
+            name: String(item.nama || item.name || '')
+          }));
+          setDbUnits(sortUnitsByImportOrder(mapped));
+        }
+      } catch (err: any) {
+        if (err && err.message && err.message.includes("Sesi telah habis")) {
+          console.warn("Failed to load units inside Pelatihan: User is offline or session expired");
+        } else {
+          console.error("Failed to load units inside Pelatihan:", err);
+        }
+      }
+    };
+    fetchUnits();
+    return () => { active = false; };
+  }, []);
+
+  const dynamicKsmPelaksanaOptions = React.useMemo(() => {
+    if (dbUnits.length === 0) return KSM_PELAKSANA_OPTIONS;
+    return dbUnits.map(u => {
+      if (u.type === 'KSM') {
+        const prefix = u.name.toLowerCase().startsWith('ksm') 
+          ? 'Kepala ' 
+          : u.name.toLowerCase().startsWith('kepala') 
+            ? '' 
+            : 'Kepala KSM ';
+        return `${prefix}${u.name}`;
+      } else {
+        const needsKepala = !u.name.toLowerCase().startsWith('kepala') && 
+                            !u.name.toLowerCase().startsWith('manajer') && 
+                            u.name.toLowerCase() !== 'komkordik';
+        return needsKepala ? `Kepala ${u.name}` : u.name;
+      }
+    });
+  }, [dbUnits]);
+
+  const dynamicKsmOptions = React.useMemo(() => {
+    if (dbUnits.length === 0) return KSM_OPTIONS;
+    return dbUnits.map(u => u.name);
+  }, [dbUnits]);
+
+  const dynamicUnitInstalasiKsmKomiteOptions = React.useMemo(() => {
+    if (dbUnits.length === 0) return UNIT_INSTALASI_KSM_KOMITE_OPTIONS;
+    return dbUnits.map(u => u.name);
+  }, [dbUnits]);
 
   const triggerSuccess = (msg: string) => {
     setSuccessMsg(msg);
@@ -353,14 +446,14 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
 
   const tabs = [
     { id: 'OVERVIEW', label: 'Dashboard', icon: Target },
-    { id: 'INHOUSE', label: 'Inhouse Training', icon: Activity },
-    { id: 'KERJASAMA', label: 'Kerjasama SKP', icon: Handshake },
-    { id: 'STUDI', label: 'Studi Banding', icon: Plane },
-    { id: 'MAGANG', label: 'Magang', icon: Briefcase },
-    { id: 'STANDAR_KEMENKES', label: 'Pelatihan Standar Kemenkes', icon: FileText },
-    { id: 'INTERNASIONAL', label: 'Kerjasama Pelatihan Internasional', icon: Globe },
     { id: 'TRAINER_SERTIFIKASI', label: 'Trainer Tersertifikasi', icon: UserCheck },
-    { id: 'MANDIRI', label: 'Pelatihan Mandiri ber-SKP', icon: Award }
+    { id: 'INTERNASIONAL', label: 'Kegiatan Internasional', icon: Globe },
+    { id: 'STANDAR_KEMENKES', label: 'Kurikulum Kemenkes', icon: FileText },
+    { id: 'MANDIRI', label: 'Kegiatan Mandiri ber SKP', icon: Award },
+    { id: 'KERJASAMA', label: 'kegiatan Kerjasama ber-SKP', icon: Handshake },
+    { id: 'INHOUSE', label: 'Inhouse Training', icon: Activity },
+    { id: 'MAGANG', label: 'Magang', icon: Briefcase },
+    { id: 'STUDI', label: 'Studi Banding', icon: Plane }
   ];
 
   const stats = [
@@ -415,8 +508,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 font-sans tracking-tight">Pelatihan & Pengembangan SDM</h1>
-        <p className="text-slate-500 mt-1">Manajemen peningkatan kapasitas, sertifikasi kompetensi, dan pemantauan kepatuhan jam pelatihan staf.</p>
+        <h1 className="text-2xl font-bold text-slate-900 font-sans tracking-tight">Pelatihan</h1>
       </div>
 
       <AnimatePresence mode="wait">
@@ -448,7 +540,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
           {activeSubMenu === 'INHOUSE' && (
             <GenericTab 
               title="Inhouse Training"
-              description="Pelatihan internal yang diselenggarakan rutin oleh KSM atau instalasi rumah sakit."
+              description="In-house Training (target 73 kegiatan)"
               records={inhouseTrainingRecords}
               onAdd={addInhouseTraining}
               onUpdate={updateInhouseTraining}
@@ -466,6 +558,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
               ]}
               successMsg={successMsg}
               triggerSuccess={triggerSuccess}
+              ksmOptions={dynamicKsmOptions}
               handleExportExcel={() => {
                 const formatted = formatInhouseTrainingExcel(inhouseTrainingRecords);
                 downloadExcelSheet('Inhouse Training', formatted, 'Inhouse_Training_RSUA');
@@ -476,8 +569,8 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
 
           {activeSubMenu === 'KERJASAMA' && (
             <GenericTab 
-              title="Kerjasama Pelatihan Ber-SKP"
-              description="Penyelenggaraan pelatihan dengan pengakuan Satuan Kredit Profesi (SKP)."
+              title="kegiatan Kerjasama ber-SKP"
+              description="Kegiatan pelatihan dan peningkatan kompetensi ber-SKP yang diselenggarakan secara kerjasama dengan pihak RS UNAIR (target 25 kegiatan)"
               records={kerjasamaSkpRecords}
               onAdd={addKerjasamaSkp}
               onUpdate={updateKerjasamaSkp}
@@ -500,7 +593,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
               triggerSuccess={triggerSuccess}
               handleExportExcel={() => {
                 const formatted = formatKerjasamaSkpExcel(kerjasamaSkpRecords);
-                downloadExcelSheet('Kerjasama SKP', formatted, 'Kerjasama_SKP_RSUA');
+                downloadExcelSheet('kegiatan Kerjasama ber-SKP', formatted, 'kegiatan_Kerjasama_ber_SKP_RSUA');
               }}
               handleExportPDF={() => generateKerjasamaSkpPdf(kerjasamaSkpRecords)}
             />
@@ -509,7 +602,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
           {activeSubMenu === 'STUDI' && (
             <GenericTab 
               title="Studi Banding"
-              description="Kegiatan kunjungan observasi ke institusi lain untuk peningkatan kualitas layanan."
+              description="Studi banding (target 6 kegiatan)"
               records={studiBandingRecords}
               onAdd={addStudiBanding}
               onUpdate={updateStudiBanding}
@@ -568,7 +661,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
           {activeSubMenu === 'MAGANG' && (
             <GenericTab 
               title="Magang"
-              description="Manajemen data program magang observer dan magang kompetensi di lingkungan RS UNAIR."
+              description="Magang (target 10 orang)"
               records={magangRecords}
               onAdd={addMagang}
               onUpdate={updateMagang}
@@ -601,8 +694,8 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
 
           {activeSubMenu === 'STANDAR_KEMENKES' && (
             <GenericTab 
-              title="Pelatihan Standar Kemenkes"
-              description="Kompilasi kurikulum pelatihan terstandar Kemenkes."
+              title="Kurikulum Kemenkes"
+              description="Kompilasi kurikulum pelatihan terstandar kemenkes (15 Kurikulum)"
               records={standarKemenkesRecords}
               onAdd={addStandarKemenkes}
               onUpdate={updateStandarKemenkes}
@@ -623,8 +716,8 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
 
           {activeSubMenu === 'INTERNASIONAL' && (
             <GenericTab 
-              title="Kerjasama Pelatihan Internasional"
-              description="Dokumentasi kerjasama pelatihan berskala internasional."
+              title="Kegiatan Internasional"
+              description="Terlaksananya kerjasama pelatihan internasional (target 3 kegiatan)"
               records={pelatihanInternasionalRecords}
               onAdd={addPelatihanInternasional}
               onUpdate={updatePelatihanInternasional}
@@ -649,7 +742,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
           {activeSubMenu === 'TRAINER_SERTIFIKASI' && (
             <GenericTab 
               title="Trainer Tersertifikasi"
-              description="Bertambahnya jumlah trainer yang tersertifikasi berbagai bidang di RS UNAIR."
+              description="Bertambahnya jumlah trainer yang tersertifikasi berbagai bidang di RS UNAIR (target 5 orang)"
               records={trainerSertifikasiRecords}
               onAdd={addTrainerSertifikasi}
               onUpdate={updateTrainerSertifikasi}
@@ -668,6 +761,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
               ]}
               successMsg={successMsg}
               triggerSuccess={triggerSuccess}
+              ksmPelaksanaOptions={dynamicKsmPelaksanaOptions}
               handleExportExcel={() => {
                 const formatted = formatTrainerSertifikasiExcel(trainerSertifikasiRecords);
                 downloadExcelSheet('Trainer Tersertifikasi', formatted, 'Trainer_Tersertifikasi_RSUA');
@@ -678,8 +772,8 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
 
           {activeSubMenu === 'MANDIRI' && (
             <GenericTab 
-              title="Pelatihan Mandiri ber-SKP"
-              description="Kegiatan pelatihan dan peningkatan kompetensi ber-SKP yang dilaksanakan secara mandiri oleh RS UNAIR."
+              title="Kegiatan Mandiri ber SKP"
+              description="Kegiatan pelatihan dan peningkatan kompetensi ber-SKP yang dilaksanakan secara mandiri oleh RS UNAIR (target 15 kegiatan)"
               records={pelatihanMandiriRecords}
               onAdd={addPelatihanMandiri}
               onUpdate={updatePelatihanMandiri}
@@ -692,7 +786,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
               fields={[
                 { key: 'judulKegiatan', label: 'Judul Kegiatan', type: 'text' },
                 { key: 'tanggalKegiatan', label: 'Tanggal Kegiatan', type: 'date' },
-                { key: 'unitKerja', label: 'Unit / Instalasi / KSM / Komite Pengaju', type: 'select', options: UNIT_INSTALASI_KSM_KOMITE_OPTIONS },
+                { key: 'unitKerja', label: 'Unit / Instalasi / KSM / Komite Pengaju', type: 'ksm-komite-select' },
                 { key: 'lpj', label: 'LPJ (Upload)', type: 'file' },
                 { key: 'suratKakRegistrasi', label: 'Surat Permohonan, KAK, Surat Registrasi Kegiatan (Upload)', type: 'file' },
                 { key: 'laporanPengendali', label: 'Laporan Pengendali Pelatihan (Upload)', type: 'file' },
@@ -700,9 +794,10 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
               ]}
               successMsg={successMsg}
               triggerSuccess={triggerSuccess}
+              ksmKomiteOptions={dynamicUnitInstalasiKsmKomiteOptions}
               handleExportExcel={() => {
                 const formatted = formatPelatihanMandiriExcel(pelatihanMandiriRecords);
-                downloadExcelSheet('Pelatihan Mandiri ber-SKP', formatted, 'Pelatihan_Mandiri_RSUA');
+                downloadExcelSheet('Kegiatan Mandiri ber SKP', formatted, 'Kegiatan_Mandiri_RSUA');
               }}
               handleExportPDF={() => generatePelatihanMandiriPdf(pelatihanMandiriRecords)}
             />
@@ -851,7 +946,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
                         <div>
                           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">KSM / Instalasi Pengusul</label>
                           <SearchableSelect 
-                            options={KSM_PELAKSANA_OPTIONS}
+                            options={dynamicKsmPelaksanaOptions}
                             value={editForm.pengusul || ''} 
                             onChange={v => setEditForm({...editForm, pengusul: v})} 
                             placeholder="Pilih KSM / Instalasi..."
@@ -1400,7 +1495,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
                         <div>
                           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Unit / Instalasi / KSM</label>
                           <SearchableSelect 
-                            options={KSM_PELAKSANA_OPTIONS}
+                            options={dynamicKsmPelaksanaOptions}
                             value={editForm.unitKerja || ''} 
                             onChange={v => setEditForm({...editForm, unitKerja: v})} 
                             placeholder="Pilih Unit / Instalasi / KSM..."
@@ -1467,7 +1562,7 @@ export function Pelatihan({ activeSubTab = 'OVERVIEW' }: PelatihanProps) {
                         <div>
                           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Unit / Instalasi / KSM / Komite Pengaju</label>
                           <SearchableSelect 
-                            options={UNIT_INSTALASI_KSM_KOMITE_OPTIONS}
+                            options={dynamicUnitInstalasiKsmKomiteOptions}
                             value={editForm.unitKerja || ''} 
                             onChange={v => setEditForm({...editForm, unitKerja: v})} 
                             placeholder="Pilih Unit / Instalasi / KSM / Komite..."
@@ -1627,9 +1722,82 @@ function OverviewTab({
   stats, pelatihanRecords, pelatihanChart, handleExportExcel, handleExportPDF, 
   setDeleteTarget, onEdit, addPelatihanRecord, updatePelatihanRecord, topPelatihanList, successMsg, triggerSuccess, formatRupiah 
 }: any) {
+  const {
+    inhouseTrainingRecords,
+    kerjasamaSkpRecords,
+    studiBandingRecords,
+    magangRecords,
+    standarKemenkesRecords,
+    pelatihanInternasionalRecords,
+    trainerSertifikasiRecords,
+    pelatihanMandiriRecords
+  } = useSMKS();
+
   const [localForm, setLocalForm] = useState({
     nama: '', kategori: 'Medis', peserta: 25, jam: 16, sert: 10, budget: 15_000_000, date: '2026-01'
   });
+
+  const targetItems = [
+    {
+      label: 'Trainer Tersertifikasi',
+      target: 5,
+      unit: 'orang',
+      current: trainerSertifikasiRecords?.length || 0,
+      color: 'from-blue-500 to-indigo-600'
+    },
+    {
+      label: 'Kegiatan Internasional',
+      target: 3,
+      unit: 'kegiatan',
+      current: pelatihanInternasionalRecords?.length || 0,
+      color: 'from-emerald-500 to-green-600'
+    },
+    {
+      label: 'Kurikulum Kemenkes',
+      target: 15,
+      unit: 'kurikulum',
+      current: standarKemenkesRecords?.length || 0,
+      color: 'from-sky-500 to-cyan-600'
+    },
+    {
+      label: 'Kegiatan Mandiri ber SKP',
+      target: 15,
+      unit: 'kegiatan',
+      current: pelatihanMandiriRecords?.length || 0,
+      color: 'from-purple-500 to-violet-600'
+    },
+    {
+      label: 'kegiatan Kerjasama ber-SKP',
+      target: 25,
+      unit: 'kegiatan',
+      current: kerjasamaSkpRecords?.length || 0,
+      color: 'from-amber-500 to-orange-600'
+    },
+    {
+      label: 'Inhouse Training',
+      target: 73,
+      unit: 'kegiatan',
+      current: inhouseTrainingRecords?.length || 0,
+      color: 'from-pink-500 to-rose-600'
+    },
+    {
+      label: 'Magang',
+      target: 10,
+      unit: 'orang',
+      current: magangRecords?.length || 0,
+      color: 'from-indigo-500 to-violet-600'
+    },
+    {
+      label: 'Studi Banding',
+      target: 6,
+      unit: 'kegiatan',
+      current: studiBandingRecords?.length || 0,
+      color: 'from-orange-500 to-red-600'
+    }
+  ];
+
+  const totalCapaian = targetItems.reduce((acc, item) => acc + Math.min(100, Math.round((item.current / item.target) * 100)), 0);
+  const averagePercentage = Math.round(totalCapaian / targetItems.length);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1652,6 +1820,66 @@ function OverviewTab({
         {stats.map((stat: any, i: number) => (
           <StatCard key={i} stat={stat} />
         ))}
+      </div>
+
+      {/* Target Progress Section */}
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 pb-4 border-b border-slate-100 gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Target className="w-5 h-5 text-unair-blue" />
+              Progres Capaian Target & Kontrak Kinerja Pelatihan
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">
+              Pemantauan real-time akumulasi capaian kegiatan dibandingkan target strategis RS UNAIR.
+            </p>
+          </div>
+          <div className="bg-unair-blue/5 border border-unair-blue/10 px-4 py-2 rounded-xl flex items-center gap-3 self-start md:self-auto shadow-sm">
+            <div className="text-right">
+              <span className="text-xs text-slate-500 block">Rata-rata Capaian</span>
+              <span className="text-lg font-extrabold text-unair-blue">{averagePercentage}%</span>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-unair-blue flex items-center justify-center text-white font-black text-sm">
+              {averagePercentage}%
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {targetItems.map((item, index) => {
+            const percent = Math.min(100, Math.round((item.current / item.target) * 100));
+            return (
+              <div key={index} className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 hover:bg-white hover:shadow-md transition-all duration-300 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-2 gap-2">
+                    <span className="text-xs font-bold text-slate-700 truncate block" title={item.label}>{item.label}</span>
+                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${percent >= 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>
+                      {percent}%
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-baseline gap-1 mt-1 mb-3">
+                    <span className="text-xl font-black text-slate-900">{item.current}</span>
+                    <span className="text-xs text-slate-400">/ {item.target} {item.unit}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1 mt-auto">
+                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className={cn("h-full rounded-full bg-gradient-to-r transition-all duration-500", item.color)} 
+                      style={{ width: `${percent}%` }} 
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                    <span>Mulai</span>
+                    <span>Target: {item.target}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1809,9 +2037,14 @@ function OverviewTab({
 
 function GenericTab({ 
   title, description, records, onAdd, onUpdate, onDelete, onEdit, editTarget, 
-  onCancelEdit, form, setForm, fields, successMsg, triggerSuccess, handleExportExcel, handleExportPDF 
+  onCancelEdit, form, setForm, fields, successMsg, triggerSuccess, handleExportExcel, handleExportPDF,
+  ksmOptions, ksmPelaksanaOptions, ksmKomiteOptions
 }: any) {
   const [uploadingKeys, setUploadingKeys] = useState<{[key: string]: boolean}>({});
+
+  const targetInfo = TARGET_MAP[title];
+  const currentCount = records ? records.length : 0;
+  const percent = targetInfo ? Math.min(100, Math.round((currentCount / targetInfo.target) * 100)) : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1854,6 +2087,40 @@ function GenericTab({
               </button>
             </div>
           </div>
+
+          {targetInfo && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1.5">
+                  <span className="text-slate-600 flex items-center gap-1">
+                    <Target className="w-3.5 h-3.5 text-unair-gold" /> Progres Capaian Target:
+                  </span>
+                  <span className="font-mono text-slate-700 bg-white px-2 py-0.5 rounded-full border border-slate-150">
+                    {currentCount} / {targetInfo.target} {targetInfo.unit} ({percent}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-unair-blue to-unair-blue-light h-full rounded-full transition-all duration-500" 
+                    style={{ width: `${percent}%` }} 
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-white/80 px-3 py-1.5 rounded-xl border border-slate-150 shadow-sm whitespace-nowrap">
+                {percent >= 100 ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="text-xs font-bold text-emerald-600">Target Tercapai</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span className="text-xs font-medium text-slate-600">Progres Berjalan</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
           
           <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200">
@@ -1933,6 +2200,22 @@ function GenericTab({
                       ))}
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {fields.find((f: any) => f.type === 'file') && (() => {
+                            const fileField = fields.find((f: any) => f.type === 'file');
+                            const url = rec[fileField.key + 'DriveUrl'] || (rec[fileField.key] && (rec[fileField.key].startsWith('http') || rec[fileField.key].includes('drive.google.com')) ? rec[fileField.key] : null);
+                            if (url) {
+                              return (
+                                <button 
+                                  onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+                                  className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer"
+                                  title="Pratinjau File"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                              );
+                            }
+                            return null;
+                          })()}
                           <button 
                             onClick={() => onEdit(rec)}
                             className="p-1.5 text-slate-400 hover:text-unair-blue hover:bg-unair-blue/5 rounded-lg transition-all cursor-pointer"
@@ -1984,13 +2267,19 @@ function GenericTab({
                   <SearchableSelect 
                     value={form[f.key] || ''} 
                     onChange={v => setForm({...form, [f.key]: v})} 
-                    options={KSM_OPTIONS}
+                    options={ksmOptions || KSM_OPTIONS}
                   />
                 ) : f.type === 'ksm-pelaksana-select' ? (
                   <SearchableSelect 
                     value={form[f.key] || ''} 
                     onChange={v => setForm({...form, [f.key]: v})} 
-                    options={KSM_PELAKSANA_OPTIONS}
+                    options={ksmPelaksanaOptions || KSM_PELAKSANA_OPTIONS}
+                  />
+                ) : f.type === 'ksm-komite-select' ? (
+                  <SearchableSelect 
+                    value={form[f.key] || ''} 
+                    onChange={v => setForm({...form, [f.key]: v})} 
+                    options={ksmKomiteOptions || UNIT_INSTALASI_KSM_KOMITE_OPTIONS}
                   />
                 ) : f.type === 'textarea' ? (
                   <textarea 

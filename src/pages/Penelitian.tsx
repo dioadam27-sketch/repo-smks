@@ -551,7 +551,6 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Inovasi & Penelitian</h1>
-          <p className="text-sm text-slate-500 mt-1">Kelola data {title.toLowerCase()} strategis rumah sakit.</p>
         </div>
         <div className="flex gap-2">
           <button 

@@ -1,2 +1,5 @@
-/api/* https://pkkii.pendidikan.unair.ac.id/smks/api.php?resource=:splat 200
-/* /index.html 200
+/api/login  https://pkkii.pendidikan.unair.ac.id/smks/api.php?resource=login  200!
+/api/:resource  https://pkkii.pendidikan.unair.ac.id/smks/api.php?resource=:resource  200!
+/api/*  https://pkkii.pendidikan.unair.ac.id/smks/api.php?resource=:splat  200!
+/*  /index.html  200
+

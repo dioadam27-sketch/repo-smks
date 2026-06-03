@@ -60,6 +60,7 @@ import {
   generatePajananPdf
 } from '../utils/pdfExportUtils';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { fetchApi } from '../lib/api';
 
 const UNAIR_FAKULTAS = [
   'Kedokteran',
@@ -508,6 +509,82 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
     updatePajananPesertaRecord,
     deletePajananPesertaRecord,
   } = useSMKS();
+
+  const [dbUnits, setDbUnits] = useState<{ id: string; type: 'Unit' | 'KSM'; name: string }[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    const sortUnitsByImportOrder = (unitsList: { id: string; type: 'Unit' | 'KSM'; name: string }[]) => {
+      return [...unitsList].sort((a, b) => {
+        const parseIdSuffix = (id: string) => {
+          const parts = id.split('_');
+          if (parts.length >= 3) {
+            const idxPart = parts.length >= 4 ? parts[2] : parts[parts.length - 1];
+            const idx = parseInt(idxPart, 10);
+            if (!isNaN(idx)) return { isImported: true, index: idx, ts: parseInt(parts[1], 10) || 0 };
+          }
+          return { isImported: false, index: 0, ts: parseInt(parts[1], 10) || parseInt(id.replace(/\D/g, ''), 10) || 0 };
+        };
+
+        const infoA = parseIdSuffix(a.id);
+        const infoB = parseIdSuffix(b.id);
+
+        if (infoA.isImported && infoB.isImported) {
+          if (infoA.ts !== infoB.ts) {
+            return infoA.ts - infoB.ts;
+          }
+          return infoA.index - infoB.index;
+        }
+        return infoA.ts - infoB.ts;
+      });
+    };
+
+    const fetchUnits = async () => {
+      try {
+        const res = await fetchApi('unit_ksm');
+        if (res.status === 'success' && Array.isArray(res.data) && active) {
+          const mapped = res.data.map((item: any) => ({
+            id: String(item.id),
+            type: item.type as 'Unit' | 'KSM',
+            name: String(item.nama || item.name || '')
+          }));
+          setDbUnits(sortUnitsByImportOrder(mapped));
+        }
+      } catch (err: any) {
+        if (err && err.message && err.message.includes("Sesi telah habis")) {
+          console.warn("Failed to load units inside Pendidikan: User is offline or session expired");
+        } else {
+          console.error("Failed to load units inside Pendidikan:", err);
+        }
+      }
+    };
+    fetchUnits();
+    return () => { active = false; };
+  }, []);
+
+  const dynamicKsmPelaksanaOptions = React.useMemo(() => {
+    if (dbUnits.length === 0) return KSM_PELAKSANA_OPTIONS;
+    return dbUnits.map(u => {
+      if (u.type === 'KSM') {
+        const prefix = u.name.toLowerCase().startsWith('ksm') 
+          ? 'Kepala ' 
+          : u.name.toLowerCase().startsWith('kepala') 
+            ? '' 
+            : 'Kepala KSM ';
+        return `${prefix}${u.name}`;
+      } else {
+        const needsKepala = !u.name.toLowerCase().startsWith('kepala') && 
+                            !u.name.toLowerCase().startsWith('manajer') && 
+                            u.name.toLowerCase() !== 'komkordik';
+        return needsKepala ? `Kepala ${u.name}` : u.name;
+      }
+    });
+  }, [dbUnits]);
+
+  const dynamicKsmOptions = React.useMemo(() => {
+    if (dbUnits.length === 0) return KSM_OPTIONS;
+    return dbUnits.map(u => u.name);
+  }, [dbUnits]);
 
   const handleExportSubTabExcel = () => {
     if (activeTab === 'B') {
@@ -1007,6 +1084,7 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
     }
 
     setCJudulBuku('');
+    setCPenerbit('');
     setCIsbn('');
     setCTanggalTerbit('');
     setCCoverBuku('');
@@ -1441,17 +1519,26 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                               </div>
                             )}
                             <p className="text-[10px] font-bold text-slate-700 truncate max-w-[150px]">{cCoverBukuName}</p>
-                            <button 
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCCoverBuku('');
-                                setCCoverBukuName('');
-                              }}
-                              className="text-[9px] text-rose-500 hover:underline font-bold mt-1"
-                            >
-                              Ganti File
-                            </button>
+                            <div className="flex gap-2 mt-2 justify-center">
+                              <button 
+                                type="button"
+                                onClick={() => window.open(cCoverBuku, '_blank', 'noopener,noreferrer')}
+                                className="flex items-center gap-1 text-[9px] text-emerald-600 hover:text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded"
+                              >
+                                <Eye className="w-3 h-3" /> Lihat
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCCoverBuku('');
+                                  setCCoverBukuName('');
+                                }}
+                                className="text-[9px] text-rose-500 hover:text-rose-600 font-bold bg-rose-50 px-2 py-1 rounded"
+                              >
+                                Ganti
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <div className="py-2">
@@ -1604,26 +1691,30 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                 {editTarget.type === 'M' && (
                   <form noValidate onSubmit={handleSubmitM} className="space-y-4">
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase">Institusi Pendidikan</label>
+                      <label className="block text-xs font-bold text-slate-500 uppercase">KSM / Instalasi (Bisa Lebih dari Satu)</label>
                       {mInstitusiList.map((inst, index) => (
-                        <div key={index} className="flex gap-2">
-                          <input 
-                            required 
-                            type="text"
-                            value={inst} 
-                            onChange={(e) => {
-                              const newList = [...mInstitusiList];
-                              newList[index] = e.target.value;
-                              setMInstitusiList(newList);
-                            }} 
-                            placeholder="Contoh: KSM Mata" 
-                            className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-unair-blue font-medium" 
-                          />
+                        <div key={index} className="flex gap-2 items-center">
+                          <div className="flex-1">
+                            <SearchableSelect
+                              options={dynamicKsmOptions}
+                              value={inst}
+                              onChange={(val) => {
+                                const newList = [...mInstitusiList];
+                                newList[index] = val;
+                                setMInstitusiList(newList);
+                              }}
+                              placeholder="Pilih KSM/Instalasi..."
+                              title="Pilih KSM / Instalasi"
+                              subtitle="Pilih KSM/Instalasi orientasi dari data admin"
+                              showTotalText="ksm/unit"
+                              allowCustom={true}
+                            />
+                          </div>
                           {mInstitusiList.length > 1 && (
                             <button 
                               type="button" 
                               onClick={() => setMInstitusiList(mInstitusiList.filter((_, i) => i !== index))}
-                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                              className="p-2 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-lg transition-colors border border-rose-100 shrink-0 self-center"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1633,9 +1724,9 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                       <button 
                         type="button" 
                         onClick={() => setMInstitusiList([...mInstitusiList, ''])}
-                        className="w-full py-1.5 border border-dashed border-slate-300 rounded-lg text-[10px] font-black uppercase text-slate-500 hover:border-unair-blue hover:text-unair-blue transition-all flex items-center justify-center gap-1.5"
+                        className="w-full py-1.5 border border-dashed border-slate-300 rounded-lg text-[10px] font-black uppercase text-slate-500 hover:border-unair-blue hover:text-unair-blue transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                       >
-                        <Plus className="w-3 h-3" /> Tambah Institusi
+                        <Plus className="w-3 h-3" /> Tambah KSM/Instalasi
                       </button>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -1817,8 +1908,7 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
 
       <div className="mb-8 flex flex-col xl:flex-row justify-between items-start xl:items-center border-b border-slate-100 pb-5 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 font-sans tracking-tight">Kinerja Kependidikan</h1>
-          <p className="text-slate-500 mt-1">Portal pencatatan terpadu Prapendidikan, IPE, Modul, Inbound, Kunjungan, MOU, dan Analisis Akselerasi RSUA.</p>
+          <h1 className="text-2xl font-bold text-slate-900 font-sans tracking-tight">Pendidikan</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -2034,7 +2124,7 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                     <div>
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-0.5">KSM Pelaksana</label>
                       <SearchableSelect
-                        options={KSM_PELAKSANA_OPTIONS}
+                        options={dynamicKsmPelaksanaOptions}
                         value={bKsm}
                         onChange={setBKsm}
                         placeholder="Pilih KSM Pelaksana..."
@@ -2116,8 +2206,14 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                             <td className="px-4 py-3.5">
                               <div className="flex items-center space-x-3">
                                 {item.coverBuku ? (
-                                  <div className="w-10 h-14 rounded shadow-sm overflow-hidden flex-shrink-0 bg-slate-100 hover:scale-110 transition-transform cursor-zoom-in">
+                                  <div 
+                                    onClick={() => window.open(item.coverBuku, '_blank', 'noopener,noreferrer')}
+                                    className="w-10 h-14 rounded shadow-sm overflow-hidden flex-shrink-0 bg-slate-100 hover:scale-110 transition-transform cursor-zoom-in relative group"
+                                  >
                                     <img src={item.coverBuku} alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                      <Eye className="w-4 h-4 text-white drop-shadow-md" />
+                                    </div>
                                   </div>
                                 ) : (
                                   <div className="w-10 h-14 rounded bg-slate-100 flex items-center justify-center flex-shrink-0 border border-slate-200">
@@ -2131,6 +2227,14 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                             <td className="px-4 py-3.5 text-slate-600 font-mono text-xs">{item.isbn}</td>
                             <td className="px-4 py-3.5 text-slate-500 font-mono text-xs">{item.tanggalTerbit}</td>
                             <td className="px-4 py-3.5 text-right text-nowrap">
+                              <button 
+                                onClick={() => item.coverBuku && window.open(item.coverBuku, '_blank', 'noopener,noreferrer')}
+                                className={`${item.coverBuku ? 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50' : 'text-slate-200 cursor-not-allowed'} p-1 rounded-md mr-1`}
+                                title={item.coverBuku ? "Pratinjau File" : "Tidak ada file"}
+                                disabled={!item.coverBuku}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
                               <button onClick={() => {
                                 setEditTarget({ id: item.id, type: 'C', data: item });
                                 setCJudulBuku(item.judulBuku);
@@ -2440,7 +2544,7 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                         <div key={idx} className="flex items-center gap-2">
                           <div className="flex-1">
                             <SearchableSelect
-                              options={KSM_OPTIONS}
+                              options={dynamicKsmOptions}
                               value={ksmItem}
                               onChange={(val) => {
                                 const newList = [...dKsmTujuanList];
@@ -2887,7 +2991,7 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                   <div className="w-full md:w-1/2">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1 ml-1">Filter KSM</label>
                     <SearchableSelect
-                      options={['SEMUA KSM', ...KSM_OPTIONS]}
+                      options={['SEMUA KSM', ...dynamicKsmOptions]}
                       value={filterGKsm}
                       onChange={setFilterGKsm}
                       placeholder="Pilih KSM..."
@@ -3064,7 +3168,7 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                       <div>
                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">1. Pilih KSM Pendidikan</label>
                         <SearchableSelect
-                          options={KSM_OPTIONS}
+                          options={dynamicKsmOptions}
                           value={gKsm}
                           onChange={setGKsm}
                           placeholder="Cari Nama KSM..."
@@ -3975,6 +4079,15 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                                   </td>
                                   <td className="px-3 py-3 text-center">
                                     <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      {rec.fileLaporan && (
+                                        <button 
+                                          onClick={() => window.open(rec.fileLaporan, '_blank', 'noopener,noreferrer')}
+                                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                          title="Pratinjau Laporan"
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </button>
+                                      )}
                                       <button onClick={() => handleEditKRecord(rec)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer" title="Edit">
                                         <Edit className="w-4 h-4" />
                                       </button>
@@ -4288,25 +4401,25 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                                       {rec.totalPeserta} PESERTA
                                     </span>
                                   </td>
-                                  <td className="px-4 py-4 text-center">
-                                    <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button 
-                                        onClick={() => {
-                                          setEditTarget({ id: rec.id, type: 'L', data: rec });
-                                          setLTanggalPelaksanaan(rec.tanggalPelaksanaan);
-                                          setLInstitusiPendidikanList(rec.institusiPendidikan.split('\n'));
-                                          setLTotalPeserta(rec.totalPeserta);
-                                        }} 
-                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer" 
-                                        title="Edit"
-                                      >
-                                        <Edit className="w-4 h-4" />
-                                      </button>
-                                      <button onClick={() => setDeleteTarget({ id: rec.id, type: 'L', title: 'Hapus Rekaman Komkordik' })} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" title="Hapus">
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </td>
+                                   <td className="px-4 py-4 text-center">
+                                     <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <button 
+                                         onClick={() => {
+                                           setEditTarget({ id: rec.id, type: 'L', data: rec });
+                                           setLTanggalPelaksanaan(rec.tanggalPelaksanaan);
+                                           setLInstitusiPendidikanList(rec.institusiPendidikan.split('\n'));
+                                           setLTotalPeserta(rec.totalPeserta);
+                                         }} 
+                                         className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer" 
+                                         title="Edit"
+                                       >
+                                         <Edit className="w-4 h-4" />
+                                       </button>
+                                       <button onClick={() => setDeleteTarget({ id: rec.id, type: 'L', title: 'Hapus Rekaman Komkordik' })} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer" title="Hapus">
+                                         <Trash2 className="w-4 h-4" />
+                                       </button>
+                                     </div>
+                                   </td>
                                 </tr>
                               )) : (
                                 <tr>
@@ -4467,19 +4580,51 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                                   <td className="px-4 py-4 text-center">
                                     <div className="flex justify-center gap-1">
                                       {rec.buktiFoto1 && (
-                                        <div className="w-8 h-8 rounded bg-slate-200 overflow-hidden border border-white shadow-sm ring-1 ring-slate-100">
-                                          <img src={rec.buktiFoto1} alt="B1" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                        <div 
+                                          onClick={() => window.open(rec.buktiFoto1, '_blank', 'noopener,noreferrer')}
+                                          className="w-8 h-8 rounded bg-slate-200 overflow-hidden border border-white shadow-sm ring-1 ring-slate-100 relative group cursor-pointer"
+                                          title="Pratinjau Foto 1"
+                                        >
+                                          <img src={rec.buktiFoto1} alt="B1" className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                            <Eye className="w-3 h-3 text-white" />
+                                          </div>
                                         </div>
                                       )}
                                       {rec.buktiFoto2 && (
-                                        <div className="w-8 h-8 rounded bg-slate-200 overflow-hidden border border-white shadow-sm ring-1 ring-slate-100">
-                                          <img src={rec.buktiFoto2} alt="B2" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                        <div 
+                                          onClick={() => window.open(rec.buktiFoto2, '_blank', 'noopener,noreferrer')}
+                                          className="w-8 h-8 rounded bg-slate-200 overflow-hidden border border-white shadow-sm ring-1 ring-slate-100 relative group cursor-pointer"
+                                          title="Pratinjau Foto 2"
+                                        >
+                                          <img src={rec.buktiFoto2} alt="B2" className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                            <Eye className="w-3 h-3 text-white" />
+                                          </div>
                                         </div>
                                       )}
                                     </div>
                                   </td>
                                   <td className="px-4 py-4 text-center">
                                     <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      {rec.buktiFoto1 && (
+                                        <button 
+                                          onClick={() => window.open(rec.buktiFoto1, '_blank', 'noopener,noreferrer')}
+                                          className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                          title="Pratinjau Foto 1"
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                      {rec.buktiFoto2 && (
+                                        <button 
+                                          onClick={() => window.open(rec.buktiFoto2, '_blank', 'noopener,noreferrer')}
+                                          className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                          title="Pratinjau Foto 2"
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </button>
+                                      )}
                                       <button 
                                         onClick={() => {
                                           setEditTarget({ id: rec.id, type: 'M', data: rec });
@@ -4541,24 +4686,28 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                         <div className="space-y-2">
                           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest font-sans">KSM / Instalasi (Bisa Lebih dari Satu)</label>
                           {mInstitusiList.map((inst, index) => (
-                            <div key={index} className="flex gap-2">
-                              <input 
-                                required
-                                type="text"
-                                value={inst}
-                                onChange={(e) => {
-                                  const newList = [...mInstitusiList];
-                                  newList[index] = e.target.value;
-                                  setMInstitusiList(newList);
-                                }}
-                                placeholder="Ketik nama KSM..."
-                                className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
-                              />
+                            <div key={index} className="flex gap-2 items-center">
+                              <div className="flex-1">
+                                <SearchableSelect
+                                  options={dynamicKsmOptions}
+                                  value={inst}
+                                  onChange={(val) => {
+                                    const newList = [...mInstitusiList];
+                                    newList[index] = val;
+                                    setMInstitusiList(newList);
+                                  }}
+                                  placeholder="Pilih KSM/Instalasi..."
+                                  title="Pilih KSM / Instalasi"
+                                  subtitle="Semua data patokan dari yang diinput admin"
+                                  showTotalText="ksm"
+                                  allowCustom={true}
+                                />
+                              </div>
                               {mInstitusiList.length > 1 && (
                                 <button 
                                   type="button"
                                   onClick={() => setMInstitusiList(mInstitusiList.filter((_, i) => i !== index))}
-                                  className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                                  className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors border border-rose-100 shrink-0"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -4568,7 +4717,7 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                           <button 
                             type="button"
                             onClick={() => setMInstitusiList([...mInstitusiList, ''])}
-                            className="w-full py-2 border border-dashed border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-500 hover:border-unair-blue hover:text-unair-blue transition-all flex items-center justify-center gap-2"
+                            className="w-full py-2 border border-dashed border-slate-300 rounded-xl text-[10px] font-black uppercase text-slate-500 hover:border-unair-blue hover:text-unair-blue transition-all flex items-center justify-center gap-2 cursor-pointer"
                           >
                             <Plus className="w-3 h-3 stroke-[3]" /> Tambah Baris
                           </button>
