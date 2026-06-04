@@ -7,7 +7,7 @@ import { fetchApi } from '../lib/api';
 interface PortalProps {
   onSelect: (mode: ViewMode) => void;
   onLogout: () => void;
-  user?: { id: string; username: string; name: string; role: string } | null;
+  user?: { id: string; username: string; name: string; role: string; menu_permissions?: string } | null;
 }
 
 export function Portal({ onSelect, onLogout, user }: PortalProps) {
@@ -18,6 +18,19 @@ export function Portal({ onSelect, onLogout, user }: PortalProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [passMessage, setPassMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
+  const [accessDeniedModal, setAccessDeniedModal] = useState<{ isOpen: boolean; title: string } | null>(null);
+
+  const hasEduAccess = isAdmin || (user?.menu_permissions && user.menu_permissions.split(',').some(p => p.startsWith('pendidikan_')));
+  const hasTrainAccess = isAdmin || (user?.menu_permissions && user.menu_permissions.split(',').some(p => p.startsWith('pelatihan_')));
+  const hasInovAccess = isAdmin || (user?.menu_permissions && user.menu_permissions.split(',').some(p => p.startsWith('penelitian_')));
+
+  const handleSelectCard = (mode: ViewMode, hasAccess: boolean, label: string) => {
+    if (!hasAccess) {
+      setAccessDeniedModal({ isOpen: true, title: label });
+      return;
+    }
+    onSelect(mode);
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,18 +148,50 @@ export function Portal({ onSelect, onLogout, user }: PortalProps) {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            onClick={() => onSelect('smks_pendidikan')}
-            className={`flex flex-col text-left group relative p-10 rounded-[40px] shadow-xl border transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer overflow-hidden ${isAdmin ? 'bg-white border-slate-100 shadow-slate-200' : 'bg-unair-blue border-unair-blue-light/10 shadow-unair-blue/20'}`}
+            onClick={() => handleSelectCard('smks_pendidikan', !!hasEduAccess, 'Pendidikan')}
+            className={`flex flex-col text-left group relative p-10 rounded-[40px] shadow-xl border transition-all overflow-hidden ${
+              !hasEduAccess 
+                ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+                : isAdmin 
+                  ? 'bg-white border-slate-100 shadow-slate-200 hover:shadow-2xl hover:-translate-y-2 cursor-pointer' 
+                  : 'bg-unair-blue border-unair-blue-light/10 shadow-unair-blue/20 hover:shadow-2xl hover:-translate-y-2 cursor-pointer'
+            }`}
           >
-            <div className={`absolute bottom-0 right-0 w-40 h-40 rounded-full blur-3xl translate-y-1/2 translate-x-1/2 transition-colors ${isAdmin ? 'bg-slate-50 group-hover:bg-slate-100' : 'bg-unair-gold/10 group-hover:bg-unair-gold/20'}`} />
+            {hasEduAccess && (
+              <div className={`absolute bottom-0 right-0 w-40 h-40 rounded-full blur-3xl translate-y-1/2 translate-x-1/2 transition-colors ${isAdmin ? 'bg-slate-50 group-hover:bg-slate-100' : 'bg-unair-gold/10 group-hover:bg-unair-gold/20'}`} />
+            )}
             
             <div className="relative z-10 flex-1 flex flex-col">
-              <div className={`w-20 h-20 shrink-0 rounded-3xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500 shadow-lg ${isAdmin ? 'bg-slate-800 text-white' : 'bg-unair-gold text-white shadow-unair-gold/20'}`}>
+              <div className={`w-20 h-20 shrink-0 rounded-3xl flex items-center justify-center mb-8 transition-transform duration-500 shadow-lg ${
+                !hasEduAccess 
+                  ? 'bg-slate-300 text-slate-500' 
+                  : isAdmin 
+                    ? 'bg-slate-800 text-white group-hover:scale-110' 
+                    : 'bg-unair-gold text-white shadow-unair-gold/20 group-hover:scale-110'
+              }`}>
                 <GraduationCap className="w-10 h-10" />
               </div>
-              <h2 className={`text-3xl font-black mb-12 uppercase tracking-tight ${isAdmin ? 'text-slate-900' : 'text-white'}`}>Pendidikan</h2>
-              <div className={`flex items-center gap-2 font-black mt-auto text-xs uppercase tracking-widest ${isAdmin ? 'text-slate-800' : 'text-unair-gold'}`}>
-                Buka Sistem <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+              <h2 className={`text-3xl font-black mb-12 uppercase tracking-tight ${
+                !hasEduAccess 
+                  ? 'text-slate-400' 
+                  : isAdmin 
+                    ? 'text-slate-900' 
+                    : 'text-white'
+              }`}>Pendidikan</h2>
+              <div className={`flex items-center gap-2 font-black mt-auto text-xs uppercase tracking-widest ${
+                !hasEduAccess 
+                  ? 'text-slate-400' 
+                  : isAdmin 
+                    ? 'text-slate-800' 
+                    : 'text-unair-gold'
+              }`}>
+                {!hasEduAccess ? (
+                  <span className="flex items-center gap-1.5"><KeyRound className="w-4 h-4" /> Akses Terbatas</span>
+                ) : (
+                  <>
+                    Buka Sistem <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                  </>
+                )}
               </div>
             </div>
           </motion.button>
@@ -156,18 +201,50 @@ export function Portal({ onSelect, onLogout, user }: PortalProps) {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            onClick={() => onSelect('smks_pelatihan')}
-            className={`flex flex-col text-left group relative p-10 rounded-[40px] shadow-xl border transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer overflow-hidden ${isAdmin ? 'bg-white border-slate-100 shadow-slate-200' : 'bg-unair-blue border-unair-blue-light/10 shadow-unair-blue/20'}`}
+            onClick={() => handleSelectCard('smks_pelatihan', !!hasTrainAccess, 'Pelatihan')}
+            className={`flex flex-col text-left group relative p-10 rounded-[40px] shadow-xl border transition-all overflow-hidden ${
+              !hasTrainAccess 
+                ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+                : isAdmin 
+                  ? 'bg-white border-slate-100 shadow-slate-200 hover:shadow-2xl hover:-translate-y-2 cursor-pointer' 
+                  : 'bg-unair-blue border-unair-blue-light/10 shadow-unair-blue/20 hover:shadow-2xl hover:-translate-y-2 cursor-pointer'
+            }`}
           >
-            <div className={`absolute bottom-0 right-0 w-40 h-40 rounded-full blur-3xl translate-y-1/2 translate-x-1/2 transition-colors ${isAdmin ? 'bg-slate-50 group-hover:bg-slate-100' : 'bg-unair-gold/10 group-hover:bg-unair-gold/20'}`} />
+            {hasTrainAccess && (
+              <div className={`absolute bottom-0 right-0 w-40 h-40 rounded-full blur-3xl translate-y-1/2 translate-x-1/2 transition-colors ${isAdmin ? 'bg-slate-50 group-hover:bg-slate-100' : 'bg-unair-gold/10 group-hover:bg-unair-gold/20'}`} />
+            )}
             
             <div className="relative z-10 flex-1 flex flex-col">
-              <div className={`w-20 h-20 shrink-0 rounded-3xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500 shadow-lg ${isAdmin ? 'bg-slate-800 text-white' : 'bg-unair-gold text-white shadow-unair-gold/20'}`}>
+              <div className={`w-20 h-20 shrink-0 rounded-3xl flex items-center justify-center mb-8 transition-transform duration-500 shadow-lg ${
+                !hasTrainAccess 
+                  ? 'bg-slate-300 text-slate-500' 
+                  : isAdmin 
+                    ? 'bg-slate-800 text-white group-hover:scale-110' 
+                    : 'bg-unair-gold text-white shadow-unair-gold/20 group-hover:scale-110'
+              }`}>
                 <Users className="w-10 h-10" />
               </div>
-              <h2 className={`text-3xl font-black mb-12 uppercase tracking-tight ${isAdmin ? 'text-slate-900' : 'text-white'}`}>Pelatihan</h2>
-              <div className={`flex items-center gap-2 font-black mt-auto text-xs uppercase tracking-widest ${isAdmin ? 'text-slate-800' : 'text-unair-gold'}`}>
-                Buka Sistem <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+              <h2 className={`text-3xl font-black mb-12 uppercase tracking-tight ${
+                !hasTrainAccess 
+                  ? 'text-slate-400' 
+                  : isAdmin 
+                    ? 'text-slate-900' 
+                    : 'text-white'
+              }`}>Pelatihan</h2>
+              <div className={`flex items-center gap-2 font-black mt-auto text-xs uppercase tracking-widest ${
+                !hasTrainAccess 
+                  ? 'text-slate-400' 
+                  : isAdmin 
+                    ? 'text-slate-800' 
+                    : 'text-unair-gold'
+              }`}>
+                {!hasTrainAccess ? (
+                  <span className="flex items-center gap-1.5"><KeyRound className="w-4 h-4" /> Akses Terbatas</span>
+                ) : (
+                  <>
+                    Buka Sistem <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                  </>
+                )}
               </div>
             </div>
           </motion.button>
@@ -177,18 +254,50 @@ export function Portal({ onSelect, onLogout, user }: PortalProps) {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            onClick={() => onSelect('smks_penelitian')}
-            className={`flex flex-col text-left group relative p-10 rounded-[40px] shadow-xl border transition-all hover:shadow-2xl hover:-translate-y-2 cursor-pointer overflow-hidden ${isAdmin ? 'bg-white border-slate-100 shadow-slate-200' : 'bg-unair-blue border-unair-blue-light/10 shadow-unair-blue/20'}`}
+            onClick={() => handleSelectCard('smks_penelitian', !!hasInovAccess, 'Penelitian & Inovasi')}
+            className={`flex flex-col text-left group relative p-10 rounded-[40px] shadow-xl border transition-all overflow-hidden ${
+              !hasInovAccess 
+                ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
+                : isAdmin 
+                  ? 'bg-white border-slate-100 shadow-slate-200 hover:shadow-2xl hover:-translate-y-2 cursor-pointer' 
+                  : 'bg-unair-blue border-unair-blue-light/10 shadow-unair-blue/20 hover:shadow-2xl hover:-translate-y-2 cursor-pointer'
+            }`}
           >
-            <div className={`absolute bottom-0 right-0 w-40 h-40 rounded-full blur-3xl translate-y-1/2 translate-x-1/2 transition-colors ${isAdmin ? 'bg-slate-50 group-hover:bg-slate-100' : 'bg-unair-gold/10 group-hover:bg-unair-gold/20'}`} />
+            {hasInovAccess && (
+              <div className={`absolute bottom-0 right-0 w-40 h-40 rounded-full blur-3xl translate-y-1/2 translate-x-1/2 transition-colors ${isAdmin ? 'bg-slate-50 group-hover:bg-slate-100' : 'bg-unair-gold/10 group-hover:bg-unair-gold/20'}`} />
+            )}
             
             <div className="relative z-10 flex-1 flex flex-col">
-              <div className={`w-20 h-20 shrink-0 rounded-3xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500 shadow-lg ${isAdmin ? 'bg-slate-800 text-white' : 'bg-unair-gold text-white shadow-unair-gold/20'}`}>
+              <div className={`w-20 h-20 shrink-0 rounded-3xl flex items-center justify-center mb-8 transition-transform duration-500 shadow-lg ${
+                !hasInovAccess 
+                  ? 'bg-slate-300 text-slate-500' 
+                  : isAdmin 
+                    ? 'bg-slate-800 text-white group-hover:scale-110' 
+                    : 'bg-unair-gold text-white shadow-unair-gold/20 group-hover:scale-110'
+              }`}>
                 <FlaskConical className="w-10 h-10" />
               </div>
-              <h2 className={`text-3xl font-black mb-12 uppercase tracking-tight ${isAdmin ? 'text-slate-900' : 'text-white'}`}>Penelitian & Inovasi</h2>
-              <div className={`flex items-center gap-2 font-black mt-auto text-xs uppercase tracking-widest ${isAdmin ? 'text-slate-800' : 'text-unair-gold'}`}>
-                Buka Sistem <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+              <h2 className={`text-3xl font-black mb-12 uppercase tracking-tight ${
+                !hasInovAccess 
+                  ? 'text-slate-400' 
+                  : isAdmin 
+                    ? 'text-slate-900' 
+                    : 'text-white'
+              }`}>Penelitian & Inovasi</h2>
+              <div className={`flex items-center gap-2 font-black mt-auto text-xs uppercase tracking-widest ${
+                !hasInovAccess 
+                  ? 'text-slate-400' 
+                  : isAdmin 
+                    ? 'text-slate-800' 
+                    : 'text-unair-gold'
+              }`}>
+                {!hasInovAccess ? (
+                  <span className="flex items-center gap-1.5"><KeyRound className="w-4 h-4" /> Akses Terbatas</span>
+                ) : (
+                  <>
+                    Buka Sistem <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
+                  </>
+                )}
               </div>
             </div>
           </motion.button>
@@ -297,6 +406,34 @@ export function Portal({ onSelect, onLogout, user }: PortalProps) {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {accessDeniedModal?.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[32px] shadow-2xl p-8 max-w-sm w-full border border-slate-100"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mb-4">
+                  <Lock className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-black text-slate-800 mb-2">Akses Terbatas: {accessDeniedModal.title}</h3>
+                <p className="text-sm text-slate-500 leading-relaxed font-semibold mb-6">
+                  Akun Anda tidak memiliki hak akses untuk membuka sub-menu di kategori ini.<br/><br/>Silakan hubungi <strong>Administrator</strong> untuk memberikan izin akses menu yang sesuai.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAccessDeniedModal(null)}
+                  className="w-full py-3.5 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-colors shadow-lg cursor-pointer"
+                >
+                  Dimengerti
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

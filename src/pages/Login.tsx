@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { authenticateUser } from '../lib/api';
 
 interface LoginProps {
-  onLogin: (user: { id: string; username: string; name: string; role: string }) => void;
+  onLogin: (user: { id: string; username: string; name: string; role: string; menu_permissions?: string }) => void;
 }
 
 export function Login({ onLogin }: LoginProps) {

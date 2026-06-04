@@ -32,7 +32,8 @@ import {
   ArrowUp,
   AlertTriangle,
   Edit,
-  Layout
+  Layout,
+  Award
 } from 'lucide-react';
 import { uploadToAppsScript } from '../utils/gdriveUpload';
 import { motion, AnimatePresence } from 'motion/react';
@@ -449,8 +450,8 @@ function SearchableSelect({
 }
 
 interface PendidikanProps {
-  activeSubTab?: 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'J' | 'K' | 'L' | 'M';
-  onChangeSubTab?: (tab: 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'J' | 'K' | 'L' | 'M') => void;
+  activeSubTab?: 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'J' | 'K' | 'L' | 'M' | 'N';
+  onChangeSubTab?: (tab: 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'J' | 'K' | 'L' | 'M' | 'N') => void;
 }
 
 export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {}) {
@@ -494,8 +495,8 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
     deleteOrientasiKsmRecord
   } = useSMKS();
 
-  // Selected Active Sub-Menu Tab (B to G, and J to M)
-  const [localActiveTab, setLocalActiveTab] = useState<'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'J' | 'K' | 'L' | 'M'>('L');
+  // Selected Active Sub-Menu Tab (B to G, and J to M, and N)
+  const [localActiveTab, setLocalActiveTab] = useState<'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'J' | 'K' | 'L' | 'M' | 'N'>('L');
   const activeTab = activeSubTab || localActiveTab;
   const setActiveTab = onChangeSubTab || setLocalActiveTab;
 
@@ -508,6 +509,10 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
     addPajananPesertaRecord,
     updatePajananPesertaRecord,
     deletePajananPesertaRecord,
+    programFellowshipRecords,
+    addProgramFellowshipRecord,
+    updateProgramFellowshipRecord,
+    deleteProgramFellowshipRecord
   } = useSMKS();
 
   const [dbUnits, setDbUnits] = useState<{ id: string; type: 'Unit' | 'KSM'; name: string }[]>([]);
@@ -651,7 +656,7 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
   // Deletion modal state for unified submenu removals
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
-    type: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'J' | 'K' | 'L' | 'M';
+    type: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'J' | 'K' | 'L' | 'M' | 'N';
     title: string;
     message?: string;
   } | null>(null);
@@ -679,6 +684,10 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
     }
     else if (type === 'L') deletePrapendidikanKomkordikRecord(id);
     else if (type === 'M') deleteOrientasiKsmRecord(id);
+    else if (type === 'N') {
+      deleteProgramFellowshipRecord(id);
+      setDeleteTarget(null);
+    }
   };
 
   const [successMsg, setSuccessMsg] = useState('');
@@ -824,6 +833,71 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
     setKProgramStudi('');
     setKTanggalKejadian('');
     setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  // Form Fields - Submenu N (Program Fellowship)
+  const [nNamaPenyelenggara, setNNamaPenyelenggara] = useState<string>('');
+  const [isKsmDropdownOpen, setIsKsmDropdownOpen] = useState(false);
+  const [ksmSearchTerm, setKsmSearchTerm] = useState('');
+  const [nNamaProgramFellowship, setNNamaProgramFellowship] = useState<string>('');
+  const [nLamaKegiatan, setNLamaKegiatan] = useState<number>(1);
+  const [nKerjasamaKolegium, setNKerjasamaKolegium] = useState<string>('');
+  const [nSearchQuery, setNSearchQuery] = useState<string>('');
+  const [nEditingRecordId, setNEditingRecordId] = useState<string | null>(null);
+
+  const handleSaveNRecord = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nNamaPenyelenggara) {
+      alert('Nama Penyelenggara (KSM) harus dipilih!');
+      return;
+    }
+    if (!nNamaProgramFellowship.trim()) {
+      alert('Nama Program Fellowship harus diisi!');
+      return;
+    }
+
+    if (nEditingRecordId) {
+      updateProgramFellowshipRecord({
+        id: nEditingRecordId,
+        namaPenyelenggara: nNamaPenyelenggara,
+        namaProgramFellowship: nNamaProgramFellowship,
+        lamaKegiatan: Number(nLamaKegiatan),
+        kerjasamaKolegium: nKerjasamaKolegium
+      });
+      setNEditingRecordId(null);
+      setSuccessMsg('Program Fellowship berhasil diperbarui!');
+    } else {
+      addProgramFellowshipRecord({
+        namaPenyelenggara: nNamaPenyelenggara,
+        namaProgramFellowship: nNamaProgramFellowship,
+        lamaKegiatan: Number(nLamaKegiatan),
+        kerjasamaKolegium: nKerjasamaKolegium
+      });
+      setSuccessMsg('Program Fellowship berhasil ditambahkan!');
+    }
+
+    // Reset Form
+    setNNamaPenyelenggara('');
+    setNNamaProgramFellowship('');
+    setNLamaKegiatan(1);
+    setNKerjasamaKolegium('');
+    setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const handleEditNRecord = (rec: any) => {
+    setNEditingRecordId(rec.id);
+    setNNamaPenyelenggara(rec.namaPenyelenggara);
+    setNNamaProgramFellowship(rec.namaProgramFellowship);
+    setNLamaKegiatan(rec.lamaKegiatan || 1);
+    setNKerjasamaKolegium(rec.kerjasamaKolegium || '');
+  };
+
+  const handleCancelEditN = () => {
+    setNEditingRecordId(null);
+    setNNamaPenyelenggara('');
+    setNNamaProgramFellowship('');
+    setNLamaKegiatan(1);
+    setNKerjasamaKolegium('');
   };
 
   const handleEditJRecord = (rec: any) => {
@@ -4824,6 +4898,267 @@ export function Pendidikan({ activeSubTab, onChangeSubTab }: PendidikanProps = {
                     </div>
                   </div>
                 </div>
+              </div>
+            );
+          })()}
+
+          {/* Submenu N: PROGRAM FELLOWSHIP */}
+          {activeTab === 'N' && (() => {
+            const filteredNRecords = (programFellowshipRecords || []).filter(r => 
+              r.namaProgramFellowship.toLowerCase().includes(nSearchQuery.toLowerCase()) ||
+              r.namaPenyelenggara.toLowerCase().includes(nSearchQuery.toLowerCase()) ||
+              r.kerjasamaKolegium.toLowerCase().includes(nSearchQuery.toLowerCase())
+            );
+
+            return (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left: Records List */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+                      {/* Search bar */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input 
+                          type="text"
+                          placeholder="Cari program fellowship, penyelenggara, atau kolegium..."
+                          value={nSearchQuery}
+                          onChange={(e) => setNSearchQuery(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-unair-blue"
+                        />
+                      </div>
+
+                      {/* Header and Table */}
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <h3 className="text-sm font-black text-unair-blue uppercase tracking-widest flex items-center gap-2">
+                          <Award className="w-5 h-5 text-indigo-500" /> PROGRAM FELLOWSHIP
+                        </h3>
+                        <span className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">{filteredNRecords.length} DATA</span>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-2xl border border-slate-100 overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs text-slate-600">
+                            <thead className="bg-slate-100/50 text-slate-500 font-black uppercase tracking-widest border-b border-slate-200/60 text-[9px]">
+                              <tr>
+                                <th className="px-4 py-3 text-left">Penyelenggara (KSM)</th>
+                                <th className="px-4 py-3 text-left">Nama Fellowship</th>
+                                <th className="px-4 py-3 text-center">Lama Kegiatan (Bulan)</th>
+                                <th className="px-4 py-3 text-left">Kerjasama Kolegium</th>
+                                <th className="px-4 py-3 text-center">Aksi</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {filteredNRecords.length === 0 ? (
+                                <tr>
+                                  <td colSpan={5} className="text-center py-8 text-slate-400 font-medium">
+                                    Belum ada data program fellowship.
+                                  </td>
+                                </tr>
+                              ) : (
+                                filteredNRecords.map((rec) => (
+                                  <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
+                                    <td className="px-4 py-3.5 font-bold text-slate-900">{rec.namaPenyelenggara}</td>
+                                    <td className="px-4 py-3.5 font-medium">{rec.namaProgramFellowship}</td>
+                                    <td className="px-4 py-3.5 text-center font-bold text-indigo-600 bg-indigo-50/50">{rec.lamaKegiatan} Bulan</td>
+                                    <td className="px-4 py-3.5 text-slate-500">{rec.kerjasamaKolegium || '-'}</td>
+                                    <td className="px-4 py-3.5 text-center">
+                                      <div className="flex items-center justify-center gap-1.5 flex-row">
+                                        <button 
+                                          type="button"
+                                          onClick={() => handleEditNRecord(rec)}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-100 cursor-pointer"
+                                          title="Edit Data"
+                                        >
+                                          <Edit className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button 
+                                          type="button"
+                                          onClick={() => setDeleteTarget({
+                                            id: rec.id,
+                                            type: 'N',
+                                            title: 'Hapus Program Fellowship',
+                                            message: `Apakah Anda yakin ingin menghapus data fellowship "${rec.namaProgramFellowship}" dari KSM ${rec.namaPenyelenggara}?`
+                                          })}
+                                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-100 cursor-pointer"
+                                          title="Hapus Data"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Form Panel */}
+                  <div className="space-y-4">
+                    <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+                      <div className="pb-2 border-b border-slate-100">
+                        <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest flex items-center gap-2">
+                          {nEditingRecordId ? <Edit className="w-4 h-4 text-amber-500" /> : <Plus className="w-5 h-5 text-emerald-500" />}
+                          {nEditingRecordId ? 'KOREKSI DATA' : 'TAMBAH KELAS FELLOWSHIP'}
+                        </h3>
+                      </div>
+
+                      <form onSubmit={handleSaveNRecord} className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest font-sans">Nama Penyelenggara (Daftar KSM)</label>
+                          <button
+                            type="button"
+                            onClick={() => setIsKsmDropdownOpen(true)}
+                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none font-sans text-unair-blue uppercase flex items-center justify-between text-left cursor-pointer"
+                          >
+                            <span>{nNamaPenyelenggara || '-- Pilih KSM --'}</span>
+                            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" />
+                          </button>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest font-sans">Nama Program Fellowship</label>
+                          <input 
+                            type="text"
+                            required
+                            placeholder="Ketik nama program fellowship..."
+                            value={nNamaProgramFellowship}
+                            onChange={(e) => setNNamaProgramFellowship(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest font-sans">Lama Kegiatan (1 - 32 Bulan)</label>
+                          <select 
+                            required
+                            value={nLamaKegiatan}
+                            onChange={(e) => setNLamaKegiatan(Number(e.target.value))}
+                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none text-unair-blue"
+                          >
+                            {Array.from({ length: 32 }, (_, k) => k + 1).map((m) => (
+                              <option key={m} value={m}>{m} Bulan</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest font-sans">Kerjasama dengan Kolegium</label>
+                          <input 
+                            type="text"
+                            required
+                            placeholder="Ketik Nama Kolegium..."
+                            value={nKerjasamaKolegium}
+                            onChange={(e) => setNKerjasamaKolegium(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
+                          />
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            className="flex-1 bg-indigo-650 hover:bg-indigo-700 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors shadow-lg shadow-indigo-900/10 cursor-pointer flex items-center justify-center gap-2"
+                          >
+                            {nEditingRecordId ? <Edit className="w-4 h-4" /> : <Plus className="w-4 h-4 stroke-[3]" />}
+                            {nEditingRecordId ? 'Simpan Koreksi' : 'Simpan Fellowship'}
+                          </button>
+                          {nEditingRecordId && (
+                            <button
+                              type="button"
+                              onClick={handleCancelEditN}
+                              className="bg-slate-100 text-slate-650 px-4 py-3 rounded-xl font-black text-[10px] uppercase hover:bg-slate-200 transition-colors cursor-pointer"
+                            >
+                              Batal
+                            </button>
+                          )}
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Searchable KSM Dropdown Popup Modal */}
+                {isKsmDropdownOpen && (
+                  <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-150 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                      {/* Header */}
+                      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
+                        <h4 className="text-xs font-black text-unair-blue uppercase tracking-widest flex items-center gap-2">
+                          <Search className="w-4 h-4 text-unair-blue" /> CARI & PILIH PENYELENGGARA (KSM)
+                        </h4>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setIsKsmDropdownOpen(false);
+                            setKsmSearchTerm('');
+                          }}
+                          className="p-1.5 hover:bg-slate-250 text-slate-400 hover:text-slate-650 rounded-xl transition-all cursor-pointer text-xs font-bold"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Search Input Box */}
+                      <div className="p-4 border-b border-slate-100 bg-white bg-slate-50/50">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input 
+                            type="text"
+                            autoFocus
+                            placeholder="Cari KSM..."
+                            value={ksmSearchTerm}
+                            onChange={(e) => setKsmSearchTerm(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black focus:bg-white focus:outline-none focus:ring-4 focus:ring-unair-blue/10 transition-all font-sans text-unair-blue uppercase placeholder:normal-case placeholder:font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      {/* KSM Options List */}
+                      <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 bg-white">
+                        {(() => {
+                          const filteredOptions = dynamicKsmOptions.filter(ksm => 
+                            ksm.toLowerCase().includes(ksmSearchTerm.toLowerCase())
+                          );
+
+                          if (filteredOptions.length === 0) {
+                            return (
+                              <div className="py-8 text-center text-slate-400 text-xs font-medium bg-white">
+                                Tidak ada KSM yang cocok dengan "{ksmSearchTerm}"
+                              </div>
+                            );
+                          }
+
+                          return filteredOptions.map(ksm => {
+                            const isSelected = nNamaPenyelenggara === ksm;
+                            return (
+                              <button
+                                key={ksm}
+                                type="button"
+                                onClick={() => {
+                                  setNNamaPenyelenggara(ksm);
+                                  setIsKsmDropdownOpen(false);
+                                  setKsmSearchTerm('');
+                                }}
+                                className={`w-full text-left px-5 py-3 text-xs font-sans uppercase transition-colors flex items-center justify-between cursor-pointer ${
+                                  isSelected 
+                                    ? 'bg-unair-blue/5 text-unair-blue font-black' 
+                                    : 'hover:bg-slate-50 text-slate-700 font-bold'
+                                }`}
+                              >
+                                <span>{ksm}</span>
+                                {isSelected && <Check className="w-4 h-4 text-unair-blue stroke-[3]" />}
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}

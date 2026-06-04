@@ -51,6 +51,14 @@ export interface PajananPesertaRecord {
   tanggalLaporan?: string;
 }
 
+export interface ProgramFellowshipRecord {
+  id: string;
+  namaPenyelenggara: string;
+  namaProgramFellowship: string;
+  lamaKegiatan: number;
+  kerjasamaKolegium: string;
+}
+
 // Submenu A: PraPendidikan & Orientasi
 export interface PraPendidikanRecord {
   id: string;
@@ -506,6 +514,22 @@ const mapIpeFromDb = (row: any): IpeRecord => ({
   tanggal: row.tanggal || '',
   pesertaUnair: Number(row.peserta_unair || 0),
   pesertaNonUnair: Number(row.peserta_non_unair || 0)
+});
+
+const mapProgramFellowshipToDb = (rec: ProgramFellowshipRecord) => ({
+  id: rec.id,
+  nama_penyelenggara: rec.namaPenyelenggara,
+  nama_program_fellowship: rec.namaProgramFellowship,
+  lama_kegiatan: Number(rec.lamaKegiatan || 1),
+  kerjasama_kolegium: rec.kerjasamaKolegium
+});
+
+const mapProgramFellowshipFromDb = (row: any): ProgramFellowshipRecord => ({
+  id: String(row.id),
+  namaPenyelenggara: row.nama_penyelenggara || '',
+  namaProgramFellowship: row.nama_program_fellowship || '',
+  lamaKegiatan: Number(row.lama_kegiatan || 1),
+  kerjasamaKolegium: row.kerjasama_kolegium || ''
 });
 
 const mapModulIpeToDb = (rec: any) => ({
@@ -1283,6 +1307,7 @@ interface SMKSContextType {
   kunjunganRecords: KunjunganRecord[];
   mouRecords: MouRecord[];
   akselerasiRecords: AkselerasiRecord[];
+  programFellowshipRecords: ProgramFellowshipRecord[];
 
   // Pelatihan & Penelitian Datasets
   pelatihanRecords: PelatihanRecord[];
@@ -1364,6 +1389,10 @@ interface SMKSContextType {
   addAkselerasiRecord: (rec: Omit<AkselerasiRecord, 'id'>) => void;
   updateAkselerasiRecord: (rec: AkselerasiRecord) => void;
   deleteAkselerasiRecord: (id: string) => void;
+
+  addProgramFellowshipRecord: (rec: Omit<ProgramFellowshipRecord, 'id'>) => void;
+  updateProgramFellowshipRecord: (rec: ProgramFellowshipRecord) => void;
+  deleteProgramFellowshipRecord: (id: string) => void;
 
   // Actions Pelatihan & Penelitian
   addPelatihanRecord: (rec: Omit<PelatihanRecord, 'id'>) => void;
@@ -1539,6 +1568,10 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [pajananPesertaRecords, setPajananPesertaRecords] = useState<PajananPesertaRecord[]>(() => {
     const saved = localStorage.getItem('smks_pajanan_peserta');
     return saved ? ensureUniqueIds(JSON.parse(saved), 'pajanan') : [];
+  });
+  const [programFellowshipRecords, setProgramFellowshipRecords] = useState<ProgramFellowshipRecord[]>(() => {
+    const saved = localStorage.getItem('smks_program_fellowship');
+    return saved ? ensureUniqueIds(JSON.parse(saved), 'fel') : [];
   });
   const [ipeRecords, setIpeRecords] = useState<IpeRecord[]>(() => {
     const saved = localStorage.getItem('smks_ipe');
@@ -1785,6 +1818,9 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem('smks_orientasi_ksm', JSON.stringify(orientasiKsmRecords));
   }, [orientasiKsmRecords]);
+  useEffect(() => {
+    localStorage.setItem('smks_program_fellowship', JSON.stringify(programFellowshipRecords));
+  }, [programFellowshipRecords]);
 
   const apiSave = async (resource: string, method: 'POST' | 'PUT' | 'DELETE', payload: any, id?: string) => {
     try {
@@ -1853,6 +1889,7 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
           fetchAndSet('orientasi_ksm', mapOrientasiKsmFromDb, setOrientasiKsmRecords, 'smks_orientasi_ksm'),
           fetchAndSet('pendapatan_pendidikan', mapPendapatanPendidikanFromDb, setPendapatanPendidikanRecords, 'smks_pendapatan_pendidikan'),
           fetchAndSet('pajanan_peserta', mapPajananPesertaFromDb, setPajananPesertaRecords, 'smks_pajanan_peserta'),
+          fetchAndSet('program_fellowship', mapProgramFellowshipFromDb, setProgramFellowshipRecords, 'smks_program_fellowship'),
         ]);
       } catch (err) {
         console.error("Gagal sinkron data startup", err);
@@ -1924,6 +1961,20 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const deletePajananPesertaRecord = (id: string) => {
     setPajananPesertaRecords(prev => prev.filter(r => r.id !== id));
     apiSave('pajanan_peserta', 'DELETE', undefined, id);
+  };
+
+  const addProgramFellowshipRecord = (rec: Omit<ProgramFellowshipRecord, 'id'>) => {
+    const newRecord = { ...rec, id: generateId('fel') };
+    setProgramFellowshipRecords(prev => [newRecord, ...prev]);
+    apiSave('program_fellowship', 'POST', mapProgramFellowshipToDb(newRecord));
+  };
+  const updateProgramFellowshipRecord = (rec: ProgramFellowshipRecord) => {
+    setProgramFellowshipRecords(prev => prev.map(r => r.id === rec.id ? rec : r));
+    apiSave('program_fellowship', 'PUT', mapProgramFellowshipToDb(rec), rec.id);
+  };
+  const deleteProgramFellowshipRecord = (id: string) => {
+    setProgramFellowshipRecords(prev => prev.filter(r => r.id !== id));
+    apiSave('program_fellowship', 'DELETE', undefined, id);
   };
 
   const addPraPendidikanRecord = (rec: Omit<PraPendidikanRecord, 'id'>) => {
@@ -2668,6 +2719,7 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
       kunjunganRecords,
       mouRecords,
       akselerasiRecords,
+      programFellowshipRecords,
       pelatihanRecords,
       pelatihanUnggulanRecords,
       inhouseTrainingRecords,
@@ -2713,6 +2765,10 @@ export const SMKSProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addPajananPesertaRecord,
       updatePajananPesertaRecord,
       deletePajananPesertaRecord,
+
+      addProgramFellowshipRecord,
+      updateProgramFellowshipRecord,
+      deleteProgramFellowshipRecord,
 
       addPraPendidikanRecord,
       updatePraPendidikanRecord,

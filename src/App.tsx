@@ -31,7 +31,7 @@ function getTabFromHash(hash: string): TabType {
   if (cleanHash === 'pendidikan') return 'pendidikan_l';
   if (cleanHash.startsWith('pendidikan/')) {
     const sub = cleanHash.split('/')[1];
-    if (['b', 'c', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm'].includes(sub)) {
+    if (['b', 'c', 'd', 'e', 'f', 'g', 'j', 'k', 'l', 'm', 'n'].includes(sub)) {
       return `pendidikan_${sub}` as TabType;
     }
   }
@@ -66,7 +66,7 @@ export default function App() {
     return (saved as ViewMode) || 'portal';
   });
 
-  const [user, setUser] = useState<{ id: string; username: string; name: string; role: string } | null>(() => {
+  const [user, setUser] = useState<{ id: string; username: string; name: string; role: string; menu_permissions?: string } | null>(() => {
     const saved = localStorage.getItem('smks_user');
     return saved ? JSON.parse(saved) : null;
   });
@@ -141,21 +141,42 @@ export default function App() {
     setViewMode('portal');
   };
 
-  const handleLogin = (userData: { id: string; username: string; name: string; role: string }) => {
+  const handleLogin = (userData: { id: string; username: string; name: string; role: string; menu_permissions?: string }) => {
     localStorage.setItem('smks_auth', 'true');
     localStorage.setItem('smks_user', JSON.stringify(userData));
     setUser(userData);
+  };
+
+  const getFirstAllowedTab = (category: 'pendidikan' | 'pelatihan' | 'penelitian'): TabType => {
+    const isAdmin = user?.role === 'System Developer' || user?.role === 'Administrator';
+    if (isAdmin) {
+      if (category === 'pendidikan') return 'pendidikan_l';
+      if (category === 'pelatihan') return 'pelatihan_trainer_sertifikasi';
+      return 'penelitian_pendapatan';
+    }
+
+    const permissions = user?.menu_permissions ? user.menu_permissions.split(',') : [];
+    if (category === 'pendidikan') {
+      const allowed = ['pendidikan_l', 'pendidikan_m', 'pendidikan_b', 'pendidikan_c', 'pendidikan_d', 'pendidikan_e', 'pendidikan_f', 'pendidikan_g', 'pendidikan_j', 'pendidikan_k', 'pendidikan_n'].filter(p => permissions.includes(p));
+      return (allowed[0] || 'pendidikan_l') as TabType;
+    }
+    if (category === 'pelatihan') {
+      const allowed = ['pelatihan_trainer_sertifikasi', 'pelatihan_internasional', 'pelatihan_standar_kemenkes', 'pelatihan_mandiri', 'pelatihan_kerjasama', 'pelatihan_inhouse', 'pelatihan_magang', 'pelatihan_studi'].filter(p => permissions.includes(p));
+      return (allowed[0] || 'pelatihan_trainer_sertifikasi') as TabType;
+    }
+    const allowed = ['penelitian_pendapatan', 'penelitian_uji_etik', 'penelitian_uji_klinik', 'penelitian_publikasi', 'penelitian_produk', 'penelitian_produk_terjual', 'penelitian_buku', 'penelitian_pengabdian', 'penelitian_proposal_arf', 'penelitian_submission_cphm', 'penelitian_paten', 'penelitian_hki'].filter(p => permissions.includes(p));
+    return (allowed[0] || 'penelitian_pendapatan') as TabType;
   };
 
   const handleSetViewMode = (mode: ViewMode) => {
     localStorage.setItem('smks_view_mode', mode);
     setViewMode(mode);
     if (mode === 'smks_pendidikan') {
-      handleSetActiveTab('pendidikan_l');
+      handleSetActiveTab(getFirstAllowedTab('pendidikan'));
     } else if (mode === 'smks_pelatihan') {
-      handleSetActiveTab('pelatihan_trainer_sertifikasi');
+      handleSetActiveTab(getFirstAllowedTab('pelatihan'));
     } else if (mode === 'smks_penelitian') {
-      handleSetActiveTab('penelitian_pendapatan');
+      handleSetActiveTab(getFirstAllowedTab('penelitian'));
     }
   };
 
@@ -189,7 +210,7 @@ export default function App() {
         {/* Hide Sidebar for prints */}
         <div className="print:hidden">
           {viewMode.startsWith('smks') && (
-            <Sidebar activeTab={activeTab} setActiveTab={handleSetActiveTab} viewMode={viewMode} />
+            <Sidebar activeTab={activeTab} setActiveTab={handleSetActiveTab} viewMode={viewMode} user={user} />
           )}
         </div>
         

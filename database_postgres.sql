@@ -1,30 +1,31 @@
--- Database Schema for SMKS Application
-SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
+-- PostgreSQL Database Schema for SMKS Application
+-- Optimized for seamless PostgreSQL imports
 
--- Users Table
+-- Create Tables
 CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     nama_lengkap VARCHAR(100),
     role VARCHAR(50),
     email VARCHAR(100),
+    menu_permissions TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
--- Unit KSM Table
+CREATE TABLE IF NOT EXISTS user_permissions (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    menu_key VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS unit_ksm (
     id VARCHAR(50) PRIMARY KEY,
     type VARCHAR(50) NOT NULL,
     name VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
--- Default Admin (Password: admin)
--- Adjust password hash if necessary for the current dummy mechanism
-INSERT IGNORE INTO users (username, password_hash, nama_lengkap, role, email) VALUES 
-('admin', '$2y$10$xK9PqfM4vR1mXUoZ6/B0guP5j4Dk8iG24o936jDscW3p9VvFv6Bvq', 'Administrator', 'System Developer', 'admin@rsua.unair.ac.id');
+);
 
 -- Pendidikan Tables
 CREATE TABLE IF NOT EXISTS prapendidikan_komkordik (
@@ -33,7 +34,7 @@ CREATE TABLE IF NOT EXISTS prapendidikan_komkordik (
     institusi_pendidikan VARCHAR(255),
     total_peserta INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS orientasi_ksm (
     id VARCHAR(50) PRIMARY KEY,
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS orientasi_ksm (
     bukti_foto2 TEXT,
     bukti_foto2_name VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS pendapatan_pendidikan (
     id VARCHAR(50) PRIMARY KEY,
@@ -60,7 +61,7 @@ CREATE TABLE IF NOT EXISTS pendapatan_pendidikan (
     bukti_pembayaran TEXT,
     bukti_pembayaran_name VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS pajanan_peserta (
     id VARCHAR(50) PRIMARY KEY,
@@ -77,9 +78,8 @@ CREATE TABLE IF NOT EXISTS pajanan_peserta (
     file_laporan TEXT,
     tanggal_laporan DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
--- Program Fellowship
 CREATE TABLE IF NOT EXISTS program_fellowship (
     id VARCHAR(50) PRIMARY KEY,
     nama_penyelenggara VARCHAR(255) NOT NULL,
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS program_fellowship (
     lama_kegiatan INT DEFAULT 1,
     kerjasama_kolegium VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS pra_pendidikan (
     id VARCHAR(50) PRIMARY KEY,
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS pra_pendidikan (
     non_unair_prodi VARCHAR(255),
     non_unair_peserta INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS ipe (
     id VARCHAR(50) PRIMARY KEY,
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS ipe (
     peserta_unair INT DEFAULT 0,
     peserta_non_unair INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS modul_ipe (
     id VARCHAR(50) PRIMARY KEY,
@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS modul_ipe (
     cover_buku TEXT,
     cover_buku_name VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS student_inbound (
     id VARCHAR(50) PRIMARY KEY,
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS student_inbound (
     ksm_tujuan TEXT,
     pembimbing TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS kunjungan (
     id VARCHAR(50) PRIMARY KEY,
@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS kunjungan (
     jumlah_peserta INT DEFAULT 0,
     universitas VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS mou (
     id VARCHAR(50) PRIMARY KEY,
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS mou (
     tahun VARCHAR(4),
     masa_berlaku VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS akselerasi (
     id VARCHAR(50) PRIMARY KEY,
@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS akselerasi (
     nov INT DEFAULT 0,
     des INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 -- Pelatihan Tables
 CREATE TABLE IF NOT EXISTS pelatihan (
@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS pelatihan (
     anggaran_realisasi DECIMAL(15,2) DEFAULT 0,
     tanggal DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS pelatihan_unggulan (
     id VARCHAR(50) PRIMARY KEY,
@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS pelatihan_unggulan (
     tanggal_selesai DATE,
     pengusul VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS inhouse_training (
     id VARCHAR(50) PRIMARY KEY,
@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS inhouse_training (
     pengusul VARCHAR(255),
     berkas_kak TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS kegiatan_kerjasama_skp (
     id VARCHAR(50) PRIMARY KEY,
@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS kegiatan_kerjasama_skp (
     laporan_pengendali_drive_url VARCHAR(255),
     total_pendapatan DECIMAL(15,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS studi_banding (
     id VARCHAR(50) PRIMARY KEY,
@@ -238,7 +238,7 @@ CREATE TABLE IF NOT EXISTS studi_banding (
     total_pendapatan DECIMAL(15,2) DEFAULT 0,
     lpj TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS dokter_observer (
     id VARCHAR(50) PRIMARY KEY,
@@ -247,7 +247,7 @@ CREATE TABLE IF NOT EXISTS dokter_observer (
     tanggal_mulai DATE,
     tanggal_selesai DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS magang (
     id VARCHAR(50) PRIMARY KEY,
@@ -261,14 +261,14 @@ CREATE TABLE IF NOT EXISTS magang (
     karya_ilmiah TEXT,
     sertifikat TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS kurikulum_kemenkes (
     id VARCHAR(50) PRIMARY KEY,
     judul_pelatihan VARCHAR(255),
     dokumen TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS kegiatan_internasional (
     id VARCHAR(50) PRIMARY KEY,
@@ -278,7 +278,7 @@ CREATE TABLE IF NOT EXISTS kegiatan_internasional (
     lpj TEXT,
     total_pendapatan DECIMAL(15,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS trainer_sertifikasi (
     id VARCHAR(50) PRIMARY KEY,
@@ -290,7 +290,7 @@ CREATE TABLE IF NOT EXISTS trainer_sertifikasi (
     sertifikat_name VARCHAR(255),
     sertifikat_drive_url VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS kegiatan_mandiri_skp (
     id VARCHAR(50) PRIMARY KEY,
@@ -308,7 +308,7 @@ CREATE TABLE IF NOT EXISTS kegiatan_mandiri_skp (
     laporan_pengendali_drive_url VARCHAR(255),
     total_pendapatan DECIMAL(15,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS monitoring_jam (
     id VARCHAR(50) PRIMARY KEY,
@@ -318,7 +318,7 @@ CREATE TABLE IF NOT EXISTS monitoring_jam (
     total_jam DECIMAL(10,2) DEFAULT 0,
     status_kepatuhan VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 -- Penelitian & Inovasi Tables
 CREATE TABLE IF NOT EXISTS penelitian (
@@ -326,12 +326,12 @@ CREATE TABLE IF NOT EXISTS penelitian (
     judul TEXT,
     peneliti_utama VARCHAR(255),
     status VARCHAR(50),
-    publikasi_scopus TINYINT(1) DEFAULT 0,
-    paten_terdaftar TINYINT(1) DEFAULT 0,
+    publikasi_scopus BOOLEAN DEFAULT FALSE,
+    paten_terdaftar BOOLEAN DEFAULT FALSE,
     dana_hibah DECIMAL(15,2) DEFAULT 0,
     tanggal_mulai DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS pendapatan_penelitian (
     id VARCHAR(50) PRIMARY KEY,
@@ -342,7 +342,7 @@ CREATE TABLE IF NOT EXISTS pendapatan_penelitian (
     pendapatan_uji_klinik DECIMAL(15,2) DEFAULT 0,
     total_pendapatan DECIMAL(15,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS uji_etik (
     id VARCHAR(50) PRIMARY KEY,
@@ -368,7 +368,7 @@ CREATE TABLE IF NOT EXISTS uji_etik (
     pembayaran_nominal DECIMAL(15,2) DEFAULT 0,
     pembayaran_status VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS uji_klinik (
     id VARCHAR(50) PRIMARY KEY,
@@ -384,7 +384,7 @@ CREATE TABLE IF NOT EXISTS uji_klinik (
     dana_rab_penelitian DECIMAL(15,2) DEFAULT 0,
     status VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS penelitian_publikasi (
     id VARCHAR(50) PRIMARY KEY,
@@ -397,7 +397,7 @@ CREATE TABLE IF NOT EXISTS penelitian_publikasi (
     tanggal_publikasi DATE,
     doi_situs_web TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS produk_inovasi (
     id VARCHAR(50) PRIMARY KEY,
@@ -412,7 +412,7 @@ CREATE TABLE IF NOT EXISTS produk_inovasi (
     foto_produk_drive_url VARCHAR(255),
     deskripsi_singkat TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS produk_inovasi_terjual (
     id VARCHAR(50) PRIMARY KEY,
@@ -421,7 +421,7 @@ CREATE TABLE IF NOT EXISTS produk_inovasi_terjual (
     nama_produk VARCHAR(255),
     jumlah_pesanan_produk INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS buku_isbn (
     id VARCHAR(50) PRIMARY KEY,
@@ -436,7 +436,7 @@ CREATE TABLE IF NOT EXISTS buku_isbn (
     bukti_buku_cetak_name VARCHAR(255),
     bukti_buku_cetak_drive_url VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS pengabdian_masyarakat (
     id VARCHAR(50) PRIMARY KEY,
@@ -446,7 +446,7 @@ CREATE TABLE IF NOT EXISTS pengabdian_masyarakat (
     skema VARCHAR(100),
     tahun VARCHAR(4),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS proposal_arf (
     id VARCHAR(50) PRIMARY KEY,
@@ -458,7 +458,7 @@ CREATE TABLE IF NOT EXISTS proposal_arf (
     target_luaran TEXT,
     dana_hibah_diperoleh DECIMAL(15,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS submission_cphm (
     id VARCHAR(50) PRIMARY KEY,
@@ -470,7 +470,7 @@ CREATE TABLE IF NOT EXISTS submission_cphm (
     file_artikel_name VARCHAR(255),
     file_artikel_drive_url VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS paten (
     id VARCHAR(50) PRIMARY KEY,
@@ -483,7 +483,7 @@ CREATE TABLE IF NOT EXISTS paten (
     bukti_sertifikat_paten_name VARCHAR(255),
     bukti_sertifikat_paten_drive_url VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE IF NOT EXISTS hki (
     id VARCHAR(50) PRIMARY KEY,
@@ -496,6 +496,4 @@ CREATE TABLE IF NOT EXISTS hki (
     bukti_sertifikat_hki_name VARCHAR(255),
     bukti_sertifikat_hki_drive_url VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
-SET FOREIGN_KEY_CHECKS = 1;
+);

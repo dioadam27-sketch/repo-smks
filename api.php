@@ -28,6 +28,49 @@ try {
     exit;
 }
 
+// Auto-migrate: check if menu_permissions column exists, if not, add it
+try {
+    $stmt = $pdo->prepare("SHOW COLUMNS FROM users LIKE 'menu_permissions'");
+    $stmt->execute();
+    if ($stmt->rowCount() === 0) {
+        $pdo->exec("ALTER TABLE users ADD COLUMN menu_permissions TEXT NULL");
+    }
+} catch (\Exception $e) {
+    // Avoid blocking if database cannot be altered (or already has column in sqlite etc)
+}
+
+// Auto-migrate: check if user_permissions table exists, if not create it
+try {
+    $stmt = $pdo->query("SHOW TABLES LIKE 'user_permissions'");
+    if ($stmt->rowCount() === 0) {
+        $pdo->exec("CREATE TABLE user_permissions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            menu_key VARCHAR(191) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    }
+} catch (\Exception $e) {
+    // Avoid blocking if database cannot be altered
+}
+
+// Auto-migrate: check if program_fellowship table exists, if not create it
+try {
+    $stmt = $pdo->query("SHOW TABLES LIKE 'program_fellowship'");
+    if ($stmt->rowCount() === 0) {
+        $pdo->exec("CREATE TABLE program_fellowship (
+            id VARCHAR(50) PRIMARY KEY,
+            nama_penyelenggara VARCHAR(255) NOT NULL,
+            nama_program_fellowship VARCHAR(255) NOT NULL,
+            lama_kegiatan INT DEFAULT 1,
+            kerjasama_kolegium VARCHAR(255) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    }
+} catch (\Exception $e) {
+    // Avoid blocking if database cannot be altered
+}
+
 // Helper to handle CRUD
 function handleCrud($pdo, $table, $allowedFields, $inputOverride = null) {
     try {
@@ -177,7 +220,137 @@ switch ($resource) {
             }
         }
     
-        handleCrud($pdo, 'users', ['id', 'username', 'password_hash', 'nama_lengkap', 'role', 'email'], $input);
+        try {
+            $method = $_SERVER['REQUEST_METHOD'];
+            switch ($method) {
+                case 'GET':
+                    if (isset($_GET['id'])) {
+                        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+                        $stmt->execute([$_GET['id']]);
+                        $row = $stmt->fetch();
+                        if ($row) {
+                            unset($row['password_hash']);
+                        }
+                        echo json_encode([
+                            'status' => 'success',
+                            'data' => $row ? $row : null
+                        ]);
+                    } else {
+                        $stmt = $pdo->query("SELECT * FROM users ORDER BY created_at DESC");
+                        $rows = $stmt->fetchAll();
+                        foreach ($rows as &$r) {
+                            unset($r['password_hash']);
+                        }
+                        echo json_encode([
+                            'status' => 'success',
+                            'data' => $rows
+                        ]);
+                    }
+                    break;
+                    
+                case 'POST':
+                    $fields = ['username', 'password_hash', 'nama_lengkap', 'role', 'email', 'menu_permissions'];
+                    $insertFields = [];
+                    $placeholders = [];
+                    $values = [];
+                    foreach ($fields as $field) {
+                        if (array_key_exists($field, $input)) {
+                            $insertFields[] = $field;
+                            $placeholders[] = "?";
+                            $values[] = $input[$field] === '' ? null : $input[$field];
+                        }
+                    }
+                    $sql = "INSERT INTO users (" . implode(', ', $insertFields) . ") VALUES (" . implode(', ', $placeholders) . ")";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute($values);
+                    $userId = $pdo->lastInsertId();
+                    
+                    // Sync user_permissions
+                    if (isset($input['menu_permissions'])) {
+                        $perms = array_filter(explode(',', $input['menu_permissions']));
+                        $stmtIns = $pdo->prepare("INSERT INTO user_permissions (user_id, menu_key) VALUES (?, ?)");
+                        foreach ($perms as $perm) {
+                            $stmtIns->execute([$userId, trim($perm)]);
+                        }
+                    }
+                    
+                    echo json_encode(['status' => 'success', 'id' => $userId]);
+                    break;
+                    
+                case 'PUT':
+                    if (!isset($_GET['id'])) {
+                        echo json_encode(['error' => 'ID required for update']);
+                        exit;
+                    }
+                    $userId = $_GET['id'];
+                    $fields = ['username', 'password_hash', 'nama_lengkap', 'role', 'email', 'menu_permissions'];
+                    $updates = [];
+                    $values = [];
+                    foreach ($fields as $field) {
+                        if (array_key_exists($field, $input)) {
+                            $updates[] = "$field = ?";
+                            $values[] = $input[$field] === '' ? null : $input[$field];
+                        }
+                    }
+                    
+                    if (!empty($updates)) {
+                        $values[] = $userId;
+                        $sql = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = ?";
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute($values);
+                    }
+                    
+                    // Sync user_permissions
+                    if (isset($input['menu_permissions'])) {
+                        $stmtDel = $pdo->prepare("DELETE FROM user_permissions WHERE user_id = ?");
+                        $stmtDel->execute([$userId]);
+                        
+                        $perms = array_filter(explode(',', $input['menu_permissions']));
+                        if (!empty($perms)) {
+                            $stmtIns = $pdo->prepare("INSERT INTO user_permissions (user_id, menu_key) VALUES (?, ?)");
+                            foreach ($perms as $perm) {
+                                $stmtIns->execute([$userId, trim($perm)]);
+                            }
+                        }
+                    }
+                    
+                    echo json_encode(['status' => 'success']);
+                    break;
+                    
+                case 'DELETE':
+                    if (!isset($_GET['id'])) {
+                        echo json_encode(['error' => 'ID required for deletion']);
+                        exit;
+                    }
+                    $userId = $_GET['id'];
+                    $stmtDel = $pdo->prepare("DELETE FROM user_permissions WHERE user_id = ?");
+                    $stmtDel->execute([$userId]);
+                    
+                    $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+                    $stmt->execute([$userId]);
+                    echo json_encode(['status' => 'success']);
+                    break;
+            }
+        } catch (\PDOException $e) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Database operation failed: ' . $e->getMessage()]);
+        }
+        break;
+
+    case 'user_permissions':
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            try {
+                $stmt = $pdo->query("SELECT up.*, u.nama_lengkap, u.username, u.role FROM user_permissions up JOIN users u ON up.user_id = u.id ORDER BY up.created_at DESC");
+                echo json_encode([
+                    'status' => 'success',
+                    'data' => $stmt->fetchAll()
+                ]);
+            } catch (\Exception $e) {
+                handleCrud($pdo, 'user_permissions', ['id', 'user_id', 'menu_key']);
+            }
+        } else {
+            handleCrud($pdo, 'user_permissions', ['id', 'user_id', 'menu_key']);
+        }
         break;
     case 'unit_ksm':
         if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -246,6 +419,9 @@ switch ($resource) {
         break;
     case 'pajanan_peserta':
         handleCrud($pdo, 'pajanan_peserta', ['id', 'nama_mahasiswa', 'nim', 'institusi_type', 'fakultas', 'program_studi', 'jenis_pajanan', 'tanggal_kejadian', 'lokasi_kejadian', 'deskripsi_kejadian', 'tindak_lanjut', 'file_laporan', 'tanggal_laporan']);
+        break;
+    case 'program_fellowship':
+        handleCrud($pdo, 'program_fellowship', ['id', 'nama_penyelenggara', 'nama_program_fellowship', 'lama_kegiatan', 'kerjasama_kolegium']);
         break;
 
     // Pelatihan

@@ -92,7 +92,7 @@ export async function authenticateUser(
   password_raw: string,
 ): Promise<{
   success: boolean;
-  user?: { id: string; username: string; name: string; role: string };
+  user?: { id: string; username: string; name: string; role: string; menu_permissions?: string };
   error?: string;
 }> {
   try {
@@ -129,6 +129,7 @@ export async function authenticateUser(
           username: res.user.username,
           name: res.user.nama_lengkap || "User",
           role: res.user.role || "User",
+          menu_permissions: res.user.menu_permissions || "",
         },
       };
     }

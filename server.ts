@@ -58,7 +58,8 @@ if (!fs.existsSync(LOCAL_DB_PATH)) {
     prapendidikan_komkordik: [],
     orientasi_ksm: [],
     pendapatan_pendidikan: [],
-    pajanan_peserta: []
+    pajanan_peserta: [],
+    program_fellowship: []
   }, null, 2));
 }
 
@@ -194,6 +195,7 @@ async function startServer() {
       if (
         !error.message.includes("HTML (Offline/WAF)") && 
         !error.message.includes("Remote API error: 500") && 
+        !error.message.includes("Remote API error: 404") && 
         error.name !== 'AbortError'
       ) {
         console.error(`[Proxy Error] ${resource}:`, error.message);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, ShieldCheck, ArrowLeft, Plus, Trash2, Edit, Lock, Loader2, Upload, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle, X, HelpCircle, Search } from 'lucide-react';
+import { Users, Building, ShieldCheck, ArrowLeft, Plus, Trash2, Edit, Lock, Loader2, Upload, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle, X, HelpCircle, Search, Check, KeyRound, Key } from 'lucide-react';
 import { motion } from 'motion/react';
 import { fetchApi } from '../lib/api';
 import * as XLSX from 'xlsx';
@@ -13,6 +13,7 @@ interface Account {
   username: string;
   name: string;
   role: string;
+  menu_permissions?: string;
 }
 
 interface UnitKSM {
@@ -46,8 +47,48 @@ const sortUnitsByImportOrder = (unitsList: UnitKSM[]): UnitKSM[] => {
   });
 };
 
+const ALL_PERMISSIONS = {
+  Pendidikan: [
+    { id: 'pendidikan_l', label: 'Prapendidikan (Komkordik)' },
+    { id: 'pendidikan_m', label: 'Orientasi KSM / Instalasi' },
+    { id: 'pendidikan_b', label: 'IPE (Interprofessional)' },
+    { id: 'pendidikan_c', label: 'Modul IPE' },
+    { id: 'pendidikan_d', label: 'Student Inbound' },
+    { id: 'pendidikan_e', label: 'Kunjungan' },
+    { id: 'pendidikan_f', label: 'Surat MOU' },
+    { id: 'pendidikan_g', label: 'Akselerasi Pendidikan' },
+    { id: 'pendidikan_j', label: 'Pendapatan Pendidikan Non UNAIR' },
+    { id: 'pendidikan_k', label: 'Data Pajanan Peserta Didik' },
+    { id: 'pendidikan_n', label: 'Program Fellowship' },
+  ],
+  Pelatihan: [
+    { id: 'pelatihan_trainer_sertifikasi', label: 'Trainer Tersertifikasi' },
+    { id: 'pelatihan_internasional', label: 'Kegiatan Internasional' },
+    { id: 'pelatihan_standar_kemenkes', label: 'Kurikulum Kemenkes' },
+    { id: 'pelatihan_mandiri', label: 'Kegiatan Mandiri ber SKP' },
+    { id: 'pelatihan_kerjasama', label: 'kegiatan Kerjasama ber-SKP' },
+    { id: 'pelatihan_inhouse', label: 'Inhouse Training' },
+    { id: 'pelatihan_magang', label: 'Magang' },
+    { id: 'pelatihan_studi', label: 'Studi Banding' },
+  ],
+  Penelitian: [
+    { id: 'penelitian_pendapatan', label: 'Pendapatan Penelitian' },
+    { id: 'penelitian_uji_etik', label: 'Pelaksanaan Uji Etik Penelitian' },
+    { id: 'penelitian_uji_klinik', label: 'Penelitian Uji Klinik' },
+    { id: 'penelitian_publikasi', label: 'Penelitian Terpublikasi dan Terindeks Internasional' },
+    { id: 'penelitian_produk', label: 'Produk Inovasi' },
+    { id: 'penelitian_produk_terjual', label: 'Produk Inovasi Terjual' },
+    { id: 'penelitian_buku', label: 'Buku ISBN' },
+    { id: 'penelitian_pengabdian', label: 'Pengabdian Masyarakat' },
+    { id: 'penelitian_proposal_arf', label: 'Proposal Penelitian Didanai (ARF)' },
+    { id: 'penelitian_submission_cphm', label: 'Submission CPHM' },
+    { id: 'penelitian_paten', label: 'Paten' },
+    { id: 'penelitian_hki', label: 'HKI' },
+  ],
+};
+
 export function AdminPortal({ onBack }: AdminPortalProps) {
-  const [activeTab, setActiveTab] = useState<'accounts' | 'units'>('accounts');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'permissions' | 'units'>('accounts');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -55,15 +96,54 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
   
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [units, setUnits] = useState<UnitKSM[]>([]);
+  const [userPermissions, setUserPermissions] = useState<any[]>([]);
+  const [searchAccountTerm, setSearchAccountTerm] = useState('');
+  const [searchPermissionTerm, setSearchPermissionTerm] = useState('');
   const [searchUnitTerm, setSearchUnitTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Account Form
+  const [accountForm, setAccountForm] = useState({ username: '', name: '', role: 'Operator', password: '', menu_permissions: [] as string[] });
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+
+  const handleTogglePermission = (permissionId: string) => {
+    const current = accountForm.menu_permissions || [];
+    if (current.includes(permissionId)) {
+      setAccountForm({
+        ...accountForm,
+        menu_permissions: current.filter(id => id !== permissionId)
+      });
+    } else {
+      setAccountForm({
+        ...accountForm,
+        menu_permissions: [...current, permissionId]
+      });
+    }
+  };
+
+  const handleToggleCategoryAll = (categoryKey: string, selectAll: boolean) => {
+    const categoryPerms = ALL_PERMISSIONS[categoryKey as keyof typeof ALL_PERMISSIONS].map(p => p.id);
+    const otherPerms = (accountForm.menu_permissions || []).filter(id => !categoryPerms.includes(id));
+    if (selectAll) {
+      setAccountForm({
+        ...accountForm,
+        menu_permissions: [...otherPerms, ...categoryPerms]
+      });
+    } else {
+      setAccountForm({
+        ...accountForm,
+        menu_permissions: otherPerms
+      });
+    }
+  };
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [accRes, unitRes] = await Promise.all([
+      const [accRes, unitRes, permRes] = await Promise.all([
         fetchApi('users', 'GET'),
-        fetchApi('unit_ksm', 'GET')
+        fetchApi('unit_ksm', 'GET'),
+        fetchApi('user_permissions', 'GET').catch(() => ({ status: 'error', data: [] }))
       ]);
       
       if (accRes.status === 'success' && Array.isArray(accRes.data)) {
@@ -71,7 +151,8 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
           id: String(d.id),
           username: d.username,
           name: d.nama_lengkap,
-          role: d.role
+          role: d.role,
+          menu_permissions: d.menu_permissions || ''
         })));
       }
       
@@ -83,11 +164,39 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
         }));
         setUnits(sortUnitsByImportOrder(rawUnits));
       }
+
+      if (permRes && permRes.status === 'success' && Array.isArray(permRes.data)) {
+        setUserPermissions(permRes.data);
+      }
     } catch (err) {
       console.error("Gagal memuat data admin:", err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDeletePermissionRelation = (id: string) => {
+    showConfirm({
+      title: "Hapus Relasi Hak Akses",
+      message: "Apakah Anda yakin ingin menghapus relasi hak akses menu ini secara permanen?",
+      type: "danger",
+      confirmText: "Hapus Relasi",
+      cancelText: "Batal",
+      onConfirm: async () => {
+        try {
+          const res = await fetchApi('user_permissions', 'DELETE', null, id);
+          if (res.status === 'success') {
+            showAlert("success", "Relasi Dihapus", "Relasi hak akses menu pengguna berhasil dihapus.");
+            loadData();
+          } else {
+            showAlert("error", "Gagal", "Gagal menghapus relasi.");
+          }
+        } catch (err) {
+          console.error(err);
+          showAlert("error", "Gagal", "Gagal menghapus relasi hak akses.");
+        }
+      }
+    });
   };
 
   useEffect(() => {
@@ -96,9 +205,6 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
     }
   }, [isAuthenticated]);
 
-  // Account Form
-  const [accountForm, setAccountForm] = useState({ username: '', name: '', role: 'Operator', password: '' });
-  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   // Unit Form
   const [unitForm, setUnitForm] = useState({ type: 'KSM' as 'KSM' | 'Unit', name: '' });
   const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
@@ -143,6 +249,9 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
     if (!accountForm.username || !accountForm.name) return;
     if (!editingAccountId && !accountForm.password) return;
     
+    // Join chosen permission identifiers into safe CSV format
+    const permissionsStr = accountForm.menu_permissions.join(',');
+
     try {
       if (editingAccountId) {
         // Update Account
@@ -150,6 +259,7 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
           username: accountForm.username,
           nama_lengkap: accountForm.name,
           role: accountForm.role,
+          menu_permissions: permissionsStr,
           ...(accountForm.password ? { password: accountForm.password } : {})
         }, editingAccountId);
 
@@ -158,11 +268,13 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
             ...acc,
             username: accountForm.username,
             name: accountForm.name,
-            role: accountForm.role
+            role: accountForm.role,
+            menu_permissions: permissionsStr
           } : acc));
           setEditingAccountId(null);
-          setAccountForm({ username: '', name: '', role: 'Operator', password: '' });
+          setAccountForm({ username: '', name: '', role: 'Operator', password: '', menu_permissions: [] });
           showAlert("success", "Akun Diperbarui", "Data akun berhasil diupdate.");
+          loadData();
         }
       } else {
         // Create Account
@@ -171,6 +283,7 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
           password: accountForm.password,
           nama_lengkap: accountForm.name,
           role: accountForm.role,
+          menu_permissions: permissionsStr,
           email: accountForm.username + '@rsua.unair.ac.id'
         });
         
@@ -179,10 +292,12 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
             id: String(res.id), 
             username: accountForm.username, 
             name: accountForm.name, 
-            role: accountForm.role 
+            role: accountForm.role,
+            menu_permissions: permissionsStr
           }, ...accounts]);
-          setAccountForm({ username: '', name: '', role: 'Operator', password: '' });
+          setAccountForm({ username: '', name: '', role: 'Operator', password: '', menu_permissions: [] });
           showAlert("success", "Akun Dibuat", "Akun berhasil dibuat.");
+          loadData();
         }
       }
     } catch (err) {
@@ -205,6 +320,7 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
           await fetchApi('users', 'DELETE', null, id);
           setAccounts(accounts.filter(a => a.id !== id));
           showAlert("success", "Akun Dihapus", `Akun "${accName}" berhasil dihapus.`);
+          loadData();
         } catch (err) {
           console.error(err);
           showAlert("error", "Gagal", "Gagal menghapus data akun.");
@@ -610,6 +726,27 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
     );
   }
 
+  const filteredAccounts = accounts.filter(acc => 
+    acc.name.toLowerCase().includes(searchAccountTerm.toLowerCase()) || 
+    acc.username.toLowerCase().includes(searchAccountTerm.toLowerCase()) ||
+    acc.role.toLowerCase().includes(searchAccountTerm.toLowerCase())
+  );
+
+  const getPermissionLabel = (id: string) => {
+    for (const [category, items] of Object.entries(ALL_PERMISSIONS)) {
+      const item = items.find(p => p.id === id);
+      if (item) return `${category} - ${item.label}`;
+    }
+    return id;
+  };
+
+  const filteredPermissions = userPermissions.filter(perm => {
+    const userLabel = (String(perm.nama_lengkap || '') + " " + String(perm.username || '')).toLowerCase();
+    const permLabel = getPermissionLabel(perm.menu_key).toLowerCase();
+    const searchLower = searchPermissionTerm.toLowerCase();
+    return userLabel.includes(searchLower) || permLabel.includes(searchLower) || String(perm.menu_key).toLowerCase().includes(searchLower);
+  });
+
   const filteredUnits = units.filter(unit => 
     unit.name.toLowerCase().includes(searchUnitTerm.toLowerCase()) || 
     unit.id.toLowerCase().includes(searchUnitTerm.toLowerCase())
@@ -644,6 +781,12 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
               className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'accounts' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'}`}
             >
               Manajemen Akun
+            </button>
+            <button 
+              onClick={() => setActiveTab('permissions')}
+              className={`px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${activeTab === 'permissions' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              Relasi Permissions
             </button>
             <button 
               onClick={() => setActiveTab('units')}
@@ -722,6 +865,80 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
                       <option value="Administrator">Administrator</option>
                     </select>
                   </div>
+
+                  {accountForm.role !== 'Administrator' && (
+                    <div className="pt-2 border-t border-slate-100 space-y-4">
+                      <div>
+                        <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Atur Hak Akses Sub-Menu</span>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-1 ml-1 leading-normal">
+                          Pilih sub-menu spesifik yang dapat diakses oleh user ini.
+                        </p>
+                      </div>
+
+                      {Object.entries(ALL_PERMISSIONS).map(([category, items]) => {
+                        const categoryPerms = items.map(p => p.id);
+                        const selectedInCat = (accountForm.menu_permissions || []).filter(id => categoryPerms.includes(id));
+                        const isAllSelected = selectedInCat.length === items.length;
+
+                        return (
+                          <div key={category} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200/60">
+                              <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{category}</span>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleCategoryAll(category, !isAllSelected)}
+                                  className="text-[9px] font-bold text-unair-blue hover:underline cursor-pointer"
+                                >
+                                  {isAllSelected ? 'Hapus Semua' : 'Pilih Semua'}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {items.map(perm => {
+                                const isChecked = (accountForm.menu_permissions || []).includes(perm.id);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={perm.id}
+                                    onClick={() => handleTogglePermission(perm.id)}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all border outline-none text-left cursor-pointer ${
+                                      isChecked
+                                        ? 'bg-unair-blue/10 text-unair-blue border-unair-blue/30 shadow-sm'
+                                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    <div className={`w-3 h-3 rounded-md border flex items-center justify-center transition-colors ${
+                                      isChecked
+                                        ? 'bg-unair-blue border-unair-blue text-white'
+                                        : 'border-slate-300 bg-slate-50'
+                                    }`}>
+                                      {isChecked && (
+                                        <Check className="w-2.5 h-2.5 stroke-[4]" />
+                                      )}
+                                    </div>
+                                    <span className="leading-none">{perm.label}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {accountForm.role === 'Administrator' && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-start gap-2.5">
+                      <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="text-xs font-black text-emerald-800">Akses Administrator Terbuka</div>
+                        <div className="text-[10px] font-semibold text-emerald-600/90 mt-1 leading-relaxed">
+                          Role Administrator secara default memiliki hak akses penuh ke seluruh modul, unit/KSM, dan pengaturan sistem.
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   <button type="submit" className="w-full pt-2 flex">
                     <div className="w-full bg-slate-900 text-white rounded-2xl py-4 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors cursor-pointer">
@@ -734,7 +951,7 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
                       type="button" 
                       onClick={() => {
                         setEditingAccountId(null);
-                        setAccountForm({ username: '', name: '', role: 'Operator', password: '' });
+                        setAccountForm({ username: '', name: '', role: 'Operator', password: '', menu_permissions: [] });
                       }}
                       className="w-full text-center text-slate-400 text-[10px] font-black uppercase tracking-widest mt-4 hover:text-slate-600 transition-colors"
                     >
@@ -742,6 +959,40 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
                     </button>
                   )}
                 </form>
+              </motion.div>
+            )}
+
+            {activeTab === 'permissions' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-[32px] p-8 shadow-xl shadow-slate-200/50 border border-slate-100"
+              >
+                <div className="flex items-center gap-3 mb-6 text-slate-800">
+                  <div className="w-10 h-10 rounded-2xl bg-unair-blue/10 flex items-center justify-center text-unair-blue">
+                    <KeyRound className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <h2 className="text-md font-black tracking-tight uppercase leading-none">Info Relasi Hak Akses</h2>
+                </div>
+                
+                <p className="text-xs text-slate-500 leading-relaxed mb-6">
+                  Daftar berikut ditarik langsung dari tabel relasi <code className="bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 font-mono text-xs font-bold text-unair-blue">user_permissions</code> yang tersambung ke database.
+                </p>
+
+                <div className="space-y-4 text-[11px] font-medium text-slate-600 bg-slate-50 p-5 rounded-2xl border border-slate-200/50 leading-relaxed">
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-unair-blue font-black shrink-0">1.</span>
+                    <span>Tiap baris memetakan nama operator/pembaca (<code className="font-mono">user_id</code>) ke kode menu (<code className="font-mono">menu_key</code>).</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-unair-blue font-black shrink-0">2.</span>
+                    <span>Operator hanya dapat melihat & mengisi menu yang memiliki relasi aktif di tabel ini.</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-unair-blue font-black shrink-0">3.</span>
+                    <span>Akun Administrator secara default memiliki semua akses dan tidak memerlukan relasi manual.</span>
+                  </div>
+                </div>
               </motion.div>
             )}
 
@@ -917,7 +1168,7 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
             <div className="bg-white rounded-[32px] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden h-full flex flex-col">
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h3 className="font-black text-slate-800 uppercase tracking-tight">
-                  {activeTab === 'accounts' ? 'Daftar Akun Sistem' : 'Daftar Unit & KSM'}
+                  {activeTab === 'accounts' ? 'Daftar Akun Sistem' : activeTab === 'permissions' ? 'Tabel Relasi Permissions' : 'Daftar Unit & KSM'}
                 </h3>
                 <div className="flex items-center gap-3">
                   {activeTab === 'units' && units.length > 0 && (
@@ -931,68 +1182,154 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
                     </button>
                   )}
                   <span className="text-xs font-bold text-slate-400 bg-white px-3 py-1.5 rounded-xl border border-slate-200">
-                    Total {activeTab === 'accounts' ? accounts.length : units.length} Data
+                    Total {activeTab === 'accounts' ? filteredAccounts.length : activeTab === 'permissions' ? filteredPermissions.length : filteredUnits.length} Data
                   </span>
                 </div>
               </div>
               
               <div className="p-8 flex-1 overflow-y-auto">
-                {activeTab === 'accounts' ? (
-                  <div className="space-y-4">
-                    {accounts.map(acc => (
-                      <div key={acc.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-unair-blue/30 hover:bg-slate-50 transition-colors group">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg uppercase">
-                            {acc.name.charAt(0)}
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800 flex items-center gap-2">
-                              {acc.name}
-                              {acc.role.includes('Admin') && (
-                                <span className="bg-rose-100 text-rose-600 text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Admin</span>
-                              )}
-                            </div>
-                            <div className="text-xs text-slate-400 font-medium">@{acc.username} • {acc.role}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            title="Edit Akun"
-                            onClick={() => {
-                              setEditingAccountId(acc.id);
-                              setAccountForm({
-                                username: acc.username,
-                                name: acc.name,
-                                role: acc.role,
-                                password: '' // Keep password empty for security, handle specially in update
-                              });
-                            }}
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-unair-blue hover:bg-unair-blue/10 transition-colors cursor-pointer"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button 
-                            title="Reset Password"
-                            onClick={() => handleResetPassword(acc.id, acc.username)}
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-unair-blue hover:bg-unair-blue/10 transition-colors cursor-pointer"
-                          >
-                            <Lock className="w-4 h-4" />
-                          </button>
-                          <button 
-                            title="Hapus Akun"
-                            onClick={() => handleDeleteAccount(acc.id)}
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                {activeTab === 'accounts' && (
+                  <div className="space-y-6">
+                    {/* Search Bar for Accounts */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-slate-400" />
                       </div>
-                    ))}
-                    {accounts.length === 0 && (
-                      <div className="text-center py-12 text-slate-400 font-medium text-sm">Belum ada data akun.</div>
-                    )}
+                      <input
+                        type="text"
+                        placeholder="Cari akun pengguna (nama, username, role)..."
+                        value={searchAccountTerm}
+                        onChange={(e) => setSearchAccountTerm(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-unair-blue/10 focus:border-unair-blue outline-none transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      {filteredAccounts.map(acc => (
+                        <div key={acc.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-unair-blue/30 hover:bg-slate-50 transition-colors group">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg uppercase">
+                              {acc.name.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-800 flex items-center gap-2">
+                                {acc.name}
+                                {acc.role.includes('Admin') && (
+                                  <span className="bg-rose-100 text-rose-600 text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Admin</span>
+                                )}
+                              </div>
+                              <div className="text-xs text-slate-400 font-medium h-fit flex items-center flex-wrap gap-y-1">
+                                <span>@{acc.username} • {acc.role}</span>
+                                {acc.role !== 'Administrator' ? (
+                                  <span className="text-unair-blue font-bold before:content-['•'] before:mx-1.5 flex items-center">
+                                    {acc.menu_permissions ? acc.menu_permissions.split(',').filter(Boolean).length : 0} menu diizinkan
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-600 font-bold before:content-['•'] before:mx-1.5 flex items-center">
+                                    Akses penuh
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              title="Edit Akun"
+                              onClick={() => {
+                                setEditingAccountId(acc.id);
+                                setAccountForm({
+                                  username: acc.username,
+                                  name: acc.name,
+                                  role: acc.role,
+                                  password: '', // Keep password empty for security, handle specially in update
+                                  menu_permissions: acc.menu_permissions ? acc.menu_permissions.split(',') : []
+                                });
+                              }}
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-unair-blue hover:bg-unair-blue/10 transition-colors cursor-pointer"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button 
+                              title="Reset Password"
+                              onClick={() => handleResetPassword(acc.id, acc.username)}
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-unair-blue hover:bg-unair-blue/10 transition-colors cursor-pointer"
+                            >
+                              <Lock className="w-4 h-4" />
+                            </button>
+                            <button 
+                              title="Hapus Akun"
+                              onClick={() => handleDeleteAccount(acc.id)}
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredAccounts.length === 0 && (
+                        <div className="text-center py-12 text-slate-400 font-medium text-sm">Pencarian tidak ditemukan atau belum ada data akun.</div>
+                      )}
+                    </div>
                   </div>
-                ) : (
+                )}
+
+                {activeTab === 'permissions' && (
+                  <div className="space-y-6">
+                    {/* Search Bar for Permissions */}
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-slate-400" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Cari berdasarkan nama pengguna, username, atau nama sub-menu..."
+                        value={searchPermissionTerm}
+                        onChange={(e) => setSearchPermissionTerm(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-unair-blue/10 focus:border-unair-blue outline-none transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      {filteredPermissions.map(perm => (
+                        <div key={perm.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-unair-blue/30 hover:bg-slate-50 transition-colors group">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                              <Key className="w-5 h-5 text-unair-blue font-bold" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-800 flex items-center gap-2">
+                                {perm.nama_lengkap || 'Unknown User'}
+                                <span className="bg-slate-100 text-slate-500 text-[9px] px-2 py-0.5 rounded-full font-mono">
+                                  @{perm.username || 'unknown'}
+                                </span>
+                              </div>
+                              <div className="text-xs font-semibold text-slate-500 flex flex-wrap gap-2 mt-1">
+                                <span className="text-unair-blue uppercase tracking-wider text-[10px] bg-unair-blue/5 px-2 py-0.5 rounded-lg border border-unair-blue/10">
+                                  {getPermissionLabel(perm.menu_key)}
+                                </span>
+                                <span className="text-slate-300 font-mono text-[9px] mt-0.5">ID: {perm.id}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              title="Hapus Relasi Hak Akses"
+                              onClick={() => handleDeletePermissionRelation(perm.id)}
+                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredPermissions.length === 0 && (
+                        <div className="text-center py-12 text-slate-400 font-medium text-sm">Pencarian tidak ditemukan atau belum ada data relasi hak akses.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'units' && (
                   <div className="space-y-6">
                     {/* Search Bar */}
                     <div className="relative">
