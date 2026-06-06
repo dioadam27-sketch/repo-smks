@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, ShieldCheck, ArrowLeft, Plus, Trash2, Edit, Lock, Loader2, Upload, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle, X, HelpCircle, Search, Check, KeyRound, Key } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Users, Building, ShieldCheck, ArrowLeft, Plus, Trash2, Edit, Lock, Loader2, Upload, Download, FileSpreadsheet, AlertTriangle, CheckCircle2, XCircle, X, HelpCircle, Search, Check, KeyRound, Key, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { fetchApi } from '../lib/api';
 import * as XLSX from 'xlsx';
 
@@ -74,7 +74,7 @@ const ALL_PERMISSIONS = {
   Penelitian: [
     { id: 'penelitian_pendapatan', label: 'Pendapatan Penelitian' },
     { id: 'penelitian_uji_etik', label: 'Pelaksanaan Uji Etik Penelitian' },
-    { id: 'penelitian_uji_klinik', label: 'Penelitian Uji Klinik' },
+    { id: 'penelitian_uji_klinik', label: 'Penelitian Uji Klinik (CRU)' },
     { id: 'penelitian_publikasi', label: 'Penelitian Terpublikasi dan Terindeks Internasional' },
     { id: 'penelitian_produk', label: 'Produk Inovasi' },
     { id: 'penelitian_produk_terjual', label: 'Produk Inovasi Terjual' },
@@ -82,8 +82,7 @@ const ALL_PERMISSIONS = {
     { id: 'penelitian_pengabdian', label: 'Pengabdian Masyarakat' },
     { id: 'penelitian_proposal_arf', label: 'Proposal Penelitian Didanai (ARF)' },
     { id: 'penelitian_submission_cphm', label: 'Submission CPHM' },
-    { id: 'penelitian_paten', label: 'Paten' },
-    { id: 'penelitian_hki', label: 'HKI' },
+    { id: 'penelitian_paten_hki', label: 'Paten & HKI' },
   ],
 };
 
@@ -97,6 +96,7 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [units, setUnits] = useState<UnitKSM[]>([]);
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
+  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<any>(null);
   const [searchAccountTerm, setSearchAccountTerm] = useState('');
   const [searchPermissionTerm, setSearchPermissionTerm] = useState('');
   const [searchUnitTerm, setSearchUnitTerm] = useState('');
@@ -1290,38 +1290,53 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
                     </div>
 
                     <div className="space-y-4">
-                      {filteredPermissions.map(perm => (
-                        <div key={perm.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-unair-blue/30 hover:bg-slate-50 transition-colors group">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-                              <Key className="w-5 h-5 text-unair-blue font-bold" />
+                      {(()=>{
+                        const groupedPermissions = Object.values(
+                          filteredPermissions.reduce((acc: any, perm: any) => {
+                            if (!acc[perm.user_id]) {
+                              acc[perm.user_id] = {
+                                user_id: perm.user_id,
+                                nama_lengkap: perm.nama_lengkap,
+                                username: perm.username,
+                                permissions: []
+                              };
+                            }
+                            acc[perm.user_id].permissions.push(perm);
+                            return acc;
+                          }, {})
+                        ) as any[];
+
+                        return groupedPermissions.map(group => (
+                          <div 
+                            key={group.user_id} 
+                            onClick={() => setSelectedUserForPermissions(group)}
+                            className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 hover:border-unair-blue/30 hover:bg-slate-50 transition-colors group cursor-pointer"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                                <Key className="w-5 h-5 text-unair-blue font-bold" />
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-800 flex items-center gap-2">
+                                  {group.nama_lengkap || 'Unknown User'}
+                                  <span className="bg-slate-100 text-slate-500 text-[9px] px-2 py-0.5 rounded-full font-mono">
+                                    @{group.username || 'unknown'}
+                                  </span>
+                                </div>
+                                <div className="text-xs font-semibold text-slate-500 flex flex-wrap gap-2 mt-1">
+                                  <span className="text-unair-blue uppercase tracking-wider text-[10px] bg-unair-blue/5 px-2 py-0.5 rounded-lg border border-unair-blue/10">
+                                    {group.permissions.length} Hak Akses
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="font-bold text-slate-800 flex items-center gap-2">
-                                {perm.nama_lengkap || 'Unknown User'}
-                                <span className="bg-slate-100 text-slate-500 text-[9px] px-2 py-0.5 rounded-full font-mono">
-                                  @{perm.username || 'unknown'}
-                                </span>
-                              </div>
-                              <div className="text-xs font-semibold text-slate-500 flex flex-wrap gap-2 mt-1">
-                                <span className="text-unair-blue uppercase tracking-wider text-[10px] bg-unair-blue/5 px-2 py-0.5 rounded-lg border border-unair-blue/10">
-                                  {getPermissionLabel(perm.menu_key)}
-                                </span>
-                                <span className="text-slate-300 font-mono text-[9px] mt-0.5">ID: {perm.id}</span>
-                              </div>
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:block">Lihat Detail</span>
+                              <ChevronRight className="w-4 h-4" />
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button 
-                              title="Hapus Relasi Hak Akses"
-                              onClick={() => handleDeletePermissionRelation(perm.id)}
-                              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                       {filteredPermissions.length === 0 && (
                         <div className="text-center py-12 text-slate-400 font-medium text-sm">Pencarian tidak ditemukan atau belum ada data relasi hak akses.</div>
                       )}
@@ -1512,6 +1527,96 @@ export function AdminPortal({ onBack }: AdminPortalProps) {
           </motion.div>
         </div>
       )}
+
+      {/* Detail Hak Akses Modal */}
+      <AnimatePresence>
+      {selectedUserForPermissions && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setSelectedUserForPermissions(null)}
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative bg-white rounded-[32px] shadow-2xl border border-slate-100 max-w-2xl w-full overflow-hidden flex flex-col max-h-[85vh]"
+          >
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-unair-blue/10 flex items-center justify-center text-unair-blue">
+                  <Key className="w-6 h-6 font-bold" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-800 tracking-tight text-lg uppercase flex items-center gap-2">
+                    Detail Hak Akses
+                  </h3>
+                  <div className="text-sm font-medium text-slate-500">
+                    {selectedUserForPermissions.nama_lengkap} (@{selectedUserForPermissions.username})
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedUserForPermissions(null)}
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-200 text-slate-500 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-3 bg-white">
+              {(() => {
+                const updatedPerms = userPermissions.filter(p => p.user_id === selectedUserForPermissions.user_id);
+                if (updatedPerms.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-slate-400 font-medium text-sm">
+                      Semua hak akses telah dihapus.
+                    </div>
+                  );
+                }
+                return updatedPerms.map((perm: any) => (
+                  <div key={perm.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
+                        <ShieldCheck className="w-4 h-4 text-slate-500" />
+                      </div>
+                      <div>
+                        <span className="text-unair-blue uppercase tracking-widest text-[10px] font-bold">
+                          {getPermissionLabel(perm.menu_key)}
+                        </span>
+                        <div className="text-[9px] font-mono text-slate-400 mt-1 uppercase">Menu Key: {perm.menu_key}</div>
+                      </div>
+                    </div>
+                    <button 
+                      title="Hapus Relasi Hak Akses"
+                      onClick={() => {
+                        handleDeletePermissionRelation(perm.id);
+                      }}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ));
+              })()}
+            </div>
+            
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button 
+                type="button"
+                onClick={() => setSelectedUserForPermissions(null)}
+                className="px-6 py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 text-white font-black rounded-xl text-xs uppercase tracking-widest transition-all cursor-pointer shadow-sm"
+              >
+                Tutup Papan Detail
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      </AnimatePresence>
     </div>
   );
 }

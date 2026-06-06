@@ -1490,7 +1490,7 @@ export function generatePenelitianPdf(records: PenelitianRecord[]) {
 export function generatePendapatanPenelitianPdf(records: PendapatanPenelitianRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Pendapatan Penelitian',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1533,7 +1533,7 @@ export function generatePendapatanPenelitianPdf(records: PendapatanPenelitianRec
 export function generateUjiEtikPdf(records: UjiEtikRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Pelaksanaan Uji Etik Penelitian',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1575,8 +1575,8 @@ export function generateUjiEtikPdf(records: UjiEtikRecord[]) {
 // 9d. Penelitian Uji Klinik
 export function generateUjiKlinikPdf(records: UjiKlinikRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
-    'Penelitian Uji Klinik',
-    'Sub-Menu Inovasi & Penelitian'
+    'Penelitian Uji Klinik (CRU)',
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1617,7 +1617,7 @@ export function generateUjiKlinikPdf(records: UjiKlinikRecord[]) {
 export function generatePenelitianPublikasiPdf(records: PenelitianPublikasiRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Penelitian Terpublikasi dan Terindeks Internasional',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1660,7 +1660,7 @@ export function generatePenelitianPublikasiPdf(records: PenelitianPublikasiRecor
 export function generateProdukInovasiPdf(records: ProdukInovasiRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Produk Inovasi (Gilir Inovasi)',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1701,7 +1701,7 @@ export function generateProdukInovasiPdf(records: ProdukInovasiRecord[]) {
 export function generateProdukInovasiTerjualPdf(records: ProdukInovasiTerjualRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Produk Inovasi Terjual',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1740,7 +1740,7 @@ export function generateProdukInovasiTerjualPdf(records: ProdukInovasiTerjualRec
 export function generateBukuIsbnPdf(records: BukuIsbnRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Buku Ber-ISBN / Chapter Book',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1781,7 +1781,7 @@ export function generateBukuIsbnPdf(records: BukuIsbnRecord[]) {
 export function generatePengabdianPdf(records: PengabdianMasyarakatRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Pengabdian Masyarakat',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1822,7 +1822,7 @@ export function generatePengabdianPdf(records: PengabdianMasyarakatRecord[]) {
 export function generateProposalArfPdf(records: ProposalArfRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Proposal ARF (Academic Research Fund)',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1863,7 +1863,7 @@ export function generateProposalArfPdf(records: ProposalArfRecord[]) {
 export function generateSubmissionCphmPdf(records: SubmissionCphmRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Submission Artikel CPHM',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1904,7 +1904,7 @@ export function generateSubmissionCphmPdf(records: SubmissionCphmRecord[]) {
 export function generatePatenPdf(records: PatenRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Paten Penelitian',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1945,7 +1945,7 @@ export function generatePatenPdf(records: PatenRecord[]) {
 export function generateHkiPdf(records: HkiRecord[]) {
   const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
     'Hak Cipta (HKI)',
-    'Sub-Menu Inovasi & Penelitian'
+    'Sub-Menu Penelitian dan Inovasi'
   );
 
   const tableData = records.map((r, idx) => [
@@ -1980,5 +1980,57 @@ export function generateHkiPdf(records: HkiRecord[]) {
   });
 
   finalizePdfPages(doc, 'HKI_Hak_Cipta', false, addHeaderFooter);
+}
+
+export interface PatenHkiPdfRecord {
+  id: string;
+  tanggalTerbit: string;
+  namaAutor: string;
+  afiliasi: string;
+  judul: string;
+  nomor: string;
+  jenis: string;
+}
+
+export function generatePatenHkiPdf(records: PatenHkiPdfRecord[]) {
+  const { doc, startY, margin, addHeaderFooter, primaryColor } = buildCleanSubMenuDoc(
+    'Paten & Hak Cipta (HKI)',
+    'Sub-Menu Penelitian dan Inovasi'
+  );
+
+  const tableData = records.map((r, idx) => [
+    idx + 1,
+    r.jenis,
+    r.tanggalTerbit,
+    r.namaAutor,
+    r.afiliasi,
+    r.judul,
+    r.nomor
+  ]);
+
+  autoTable(doc, {
+    startY,
+    head: [['No', 'Jenis', 'Tgl Terbit', 'Autor / Inventor', 'Afiliasi', 'Judul Karya', 'Nomor Paten/HKI']],
+    body: tableData.length > 0 ? tableData : [['-', '-', 'Tidak ada data tercatat', '-', '-', '-', '-']],
+    theme: 'grid',
+    headStyles: { fillColor: primaryColor, fontSize: 8, fontStyle: 'bold', halign: 'center' },
+    bodyStyles: { fontSize: 7.5 },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 22, halign: 'center' },
+      2: { cellWidth: 18, halign: 'center' },
+      3: { cellWidth: 32 },
+      4: { cellWidth: 26 },
+      5: { cellWidth: 50, fontStyle: 'bold' },
+      6: { cellWidth: 26 }
+    },
+    margin: { left: margin, right: margin },
+    didDrawCell: (data) => handleDidDrawCellWithLink(doc, data),
+    didDrawPage: (dataHook) => {
+      addHeaderFooter(doc, dataHook.pageNumber, '{total_pages_count_string}');
+    }
+  });
+
+  finalizePdfPages(doc, 'Paten_dan_HKI', false, addHeaderFooter);
 }
 

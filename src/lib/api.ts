@@ -6,23 +6,18 @@
  * This completely masks your PHP hosting domain from appearing in the browser's developer console or network logs.
  */
 
-// Obfuscated Base64 fallback (just for reference)
-const OBFUSCATED_API_ENDPOINT =
-  "aHR0cHM6Ly9wa2tpaS5wZW5kaWRpa2FuLnVuYWlyLmFjLmlkL3Nta3MvYXBpLnBocA==";
+const REMOTE_API_BASE = "https://pkkii.pendidikan.unair.ac.id/smks/api.php";
 
-/**
- * Resolves original API url securely if direct calls are ever needed.
- */
 export function getApiUrl(): string {
-  // We use the proxy provided by server.ts to handle fallback and CORS
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api`;
+  }
   return "/api";
 }
 
 export function getEndpoint(resource: string): string {
-  if (resource === 'login') {
-    return "/api/login";
-  }
-  return `/api/${resource}`;
+  const baseUrl = getApiUrl();
+  return `${baseUrl}/${resource}`;
 }
 
 export async function fetchApi(
@@ -69,7 +64,14 @@ export async function fetchApi(
       throw new Error("Sesi telah habis, silakan login kembali.");
     }
     if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`);
+      let errBody = "";
+      try {
+        const errJson = await res.json();
+        errBody = JSON.stringify(errJson);
+      } catch (e) {
+        errBody = await res.text();
+      }
+      throw new Error(`HTTP error! status: ${res.status}, body: ${errBody}`);
     }
     return await res.json();
   } catch (error) {

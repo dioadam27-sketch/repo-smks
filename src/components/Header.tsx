@@ -28,7 +28,7 @@ export function Header({ onLogout, user, onBackToPortal, viewMode, onSwitchViewM
     { mode: 'dashboard' as ViewMode, label: 'Dashboard Utama', icon: LayoutDashboard, color: 'text-sky-600 bg-sky-50' },
     { mode: 'smks_pendidikan' as ViewMode, label: 'Pendidikan', icon: GraduationCap, color: 'text-emerald-600 bg-emerald-50' },
     { mode: 'smks_pelatihan' as ViewMode, label: 'Pelatihan', icon: Users, color: 'text-indigo-600 bg-indigo-50' },
-    { mode: 'smks_penelitian' as ViewMode, label: 'Inovasi & Penelitian', icon: FlaskConical, color: 'text-amber-600 bg-amber-50' },
+    { mode: 'smks_penelitian' as ViewMode, label: 'Penelitian dan Inovasi', icon: FlaskConical, color: 'text-amber-600 bg-amber-50' },
   ];
 
   const currentOption = options.find(o => o.mode === viewMode) || options[0];

@@ -49,6 +49,13 @@ try {
             menu_key VARCHAR(191) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    } else {
+        // Ensure created_at exists
+        $stmtCol = $pdo->prepare("SHOW COLUMNS FROM user_permissions LIKE 'created_at'");
+        $stmtCol->execute();
+        if ($stmtCol->rowCount() === 0) {
+            $pdo->exec("ALTER TABLE user_permissions ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+        }
     }
 } catch (\Exception $e) {
     // Avoid blocking if database cannot be altered
@@ -88,7 +95,15 @@ function handleCrud($pdo, $table, $allowedFields, $inputOverride = null) {
                         'data' => $row ? $row : null
                     ]);
                 } else {
-                    $stmt = $pdo->query("SELECT * FROM $table ORDER BY created_at DESC");
+                    try {
+                        $stmt = $pdo->query("SELECT * FROM $table ORDER BY created_at DESC");
+                    } catch (\PDOException $e) {
+                        if (strpos($e->getMessage(), 'created_at') !== false) {
+                            $stmt = $pdo->query("SELECT * FROM $table");
+                        } else {
+                            throw $e;
+                        }
+                    }
                     echo json_encode([
                         'status' => 'success',
                         'data' => $stmt->fetchAll()

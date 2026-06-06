@@ -473,7 +473,7 @@ export function DashboardSummary({ onNavigate }: DashboardSummaryProps) {
     },
     {
       id: 'penelitian_uji_klinik' as TabType,
-      title: 'Penelitian Uji Klinik',
+      title: 'Penelitian Uji Klinik (CRU)',
       count: ujiKlinikRecords.length,
       unit: 'Proyek',
       icon: Activity,
@@ -524,29 +524,27 @@ export function DashboardSummary({ onNavigate }: DashboardSummaryProps) {
       chartField: 'author',
     },
     {
-      id: 'penelitian_paten' as TabType,
-      title: 'Paten RSUA',
-      count: patenRecords.length,
-      unit: 'Paten',
-      icon: ShieldAlert,
-      color: 'bg-green-800',
-      tag: 'Intellectual Property - Patents',
-      records: patenRecords,
-      fields: ['judulPaten', 'nomorPaten', 'namaAutor', 'tanggalTerbit'],
-      labels: ['Judul Paten', 'Nomor Paten', 'Author', 'Tgl Terbit'],
-      chartField: 'namaAutor',
-    },
-    {
-      id: 'penelitian_hki' as TabType,
-      title: 'HKI RSUA',
-      count: hkiRecords.length,
-      unit: 'Sertifikat',
+      id: 'penelitian_paten_hki' as TabType,
+      title: 'Paten & HKI RSUA',
+      count: patenRecords.length + hkiRecords.length,
+      unit: 'Karya',
       icon: Award,
-      color: 'bg-emerald-900',
-      tag: 'Hak Kekayaan Intelektual',
-      records: hkiRecords,
-      fields: ['judulHki', 'nomorHki', 'namaAutor', 'tanggalTerbit'],
-      labels: ['Judul HKI', 'Nomor HKI', 'Author', 'Tgl Terbit'],
+      color: 'bg-green-800',
+      tag: 'Intellectual Property & Patents',
+      records: [
+        ...hkiRecords.map(r => ({ id: r.id, judul: r.judulHki, nomor: r.nomorHki, namaAutor: r.namaAutor, tanggalTerbit: r.tanggalTerbit, jenis: 'Karya Cipta' })),
+        ...patenRecords.map(r => {
+          const isSederhana = r.nomorPaten.startsWith('[Paten Sederhana] ');
+          const isPatenPrefixed = r.nomorPaten.startsWith('[Paten] ');
+          const cleanNomor = isSederhana 
+            ? r.nomorPaten.replace('[Paten Sederhana] ', '') 
+            : (isPatenPrefixed ? r.nomorPaten.replace('[Paten] ', '') : r.nomorPaten);
+          const jenis = isSederhana ? 'Paten Sederhana' : 'Paten';
+          return { id: r.id, judul: r.judulPaten, nomor: cleanNomor, namaAutor: r.namaAutor, tanggalTerbit: r.tanggalTerbit, jenis };
+        })
+      ],
+      fields: ['jenis', 'judul', 'nomor', 'namaAutor', 'tanggalTerbit'],
+      labels: ['Jenis', 'Judul Karya', 'Nomor Sertifikat/Permohonan', 'Author (Inventor)', 'Tgl Terbit'],
       chartField: 'namaAutor',
     },
   ], [penelitianRecords, penelitianPublikasiRecords, ujiEtikRecords, bukuIsbnRecords, kepkRecords, pengabdianMasyarakatRecords, produkInovasiRecords, pendapatanPenelitianRecords, ujiKlinikRecords, produkInovasiTerjualRecords, proposalArfRecords, submissionCphmRecords, patenRecords, hkiRecords]);

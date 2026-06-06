@@ -62,6 +62,9 @@ export function Sidebar({ activeTab, setActiveTab, viewMode, user }: SidebarProp
       return true;
     }
     const permissions = user.menu_permissions ? user.menu_permissions.split(',') : [];
+    if (itemId === 'penelitian_paten_hki') {
+      return permissions.includes('penelitian_paten_hki') || permissions.includes('penelitian_paten') || permissions.includes('penelitian_hki');
+    }
     return permissions.includes(itemId);
   };
 
@@ -93,7 +96,7 @@ export function Sidebar({ activeTab, setActiveTab, viewMode, user }: SidebarProp
   const inovSubItemsRaw = [
     { id: 'penelitian_pendapatan', label: 'Pendapatan Penelitian', icon: Coins },
     { id: 'penelitian_uji_etik', label: 'Pelaksanaan Uji Etik Penelitian', icon: FlaskConical },
-    { id: 'penelitian_uji_klinik', label: 'Penelitian Uji Klinik', icon: Users },
+    { id: 'penelitian_uji_klinik', label: 'Penelitian Uji Klinik (CRU)', icon: Users },
     { id: 'penelitian_publikasi', label: 'Penelitian Terpublikasi dan Terindeks Internasional', icon: FileText },
     { id: 'penelitian_produk', label: 'Produk Inovasi', icon: Activity },
     { id: 'penelitian_produk_terjual', label: 'Produk Inovasi Terjual', icon: Coins },
@@ -101,8 +104,7 @@ export function Sidebar({ activeTab, setActiveTab, viewMode, user }: SidebarProp
     { id: 'penelitian_pengabdian', label: 'Pengabdian Masyarakat', icon: Users2 },
     { id: 'penelitian_proposal_arf', label: 'Proposal Penelitian Didanai (ARF)', icon: Award },
     { id: 'penelitian_submission_cphm', label: 'Submission CPHM', icon: FileText },
-    { id: 'penelitian_paten', label: 'Paten', icon: Award },
-    { id: 'penelitian_hki', label: 'HKI', icon: Award },
+    { id: 'penelitian_paten_hki', label: 'Paten & HKI', icon: Award },
   ] as const;
 
   const eduSubItems = eduSubItemsRaw.filter(item => hasPermission(item.id));
@@ -124,7 +126,7 @@ export function Sidebar({ activeTab, setActiveTab, viewMode, user }: SidebarProp
     },
     { 
       id: 'penelitian', 
-      label: 'Inovasi & Penelitian', 
+      label: 'Penelitian dan Inovasi', 
       icon: FlaskConical,
       hasSubmenu: true
     },

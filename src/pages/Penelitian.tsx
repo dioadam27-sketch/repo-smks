@@ -50,7 +50,8 @@ import {
   generateProposalArfPdf,
   generateSubmissionCphmPdf,
   generatePatenPdf,
-  generateHkiPdf
+  generateHkiPdf,
+  generatePatenHkiPdf
 } from '../utils/pdfExportUtils';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -68,12 +69,13 @@ type SubTab =
   | 'proposal_arf'
   | 'submission_cphm'
   | 'paten'
-  | 'hki';
+  | 'hki'
+  | 'paten_hki';
 
 const SUB_TABS = [
   { id: 'penelitian_pendapatan' as const, label: 'Pendapatan Penelitian', icon: Activity },
   { id: 'uji_etik' as const, label: 'Uji Etik Penelitian', icon: FlaskConical },
-  { id: 'penelitian_uji_klinik' as const, label: 'Penelitian Uji Klinik', icon: FlaskConical },
+  { id: 'penelitian_uji_klinik' as const, label: 'Penelitian Uji Klinik (CRU)', icon: FlaskConical },
   { id: 'penelitian_publikasi' as const, label: 'Penelitian Terpublikasi', icon: FileText },
   { id: 'produk_inovasi' as const, label: 'Produk Inovasi (Gilir Inovasi)', icon: Activity },
   { id: 'produk_inovasi_terjual' as const, label: 'Produk Inovasi Terjual', icon: Activity },
@@ -81,8 +83,7 @@ const SUB_TABS = [
   { id: 'pengabdian_masyarakat' as const, label: 'Pengabdian Masyarakat', icon: Users2 },
   { id: 'proposal_arf' as const, label: 'Proposal ARF', icon: FileText },
   { id: 'submission_cphm' as const, label: 'Submission Artikel CPHM', icon: FileText },
-  { id: 'paten' as const, label: 'Paten', icon: Award },
-  { id: 'hki' as const, label: 'Hak Cipta (HKI)', icon: Award }
+  { id: 'paten_hki' as const, label: 'Paten & HKI', icon: Award }
 ];
 
 interface PenelitianProps {
@@ -149,8 +150,7 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
     if (t === 'pengabdian') return 'pengabdian_masyarakat';
     if (t === 'proposal_arf') return 'proposal_arf';
     if (t === 'submission_cphm') return 'submission_cphm';
-    if (t === 'paten') return 'paten';
-    if (t === 'hki') return 'hki';
+    if (t === 'paten' || t === 'hki' || t === 'paten_hki' || t === 'penelitian_paten_hki' || t === 'penelitian_paten' || t === 'penelitian_hki') return 'paten_hki';
     return t; // if it's already one of the exact SubTab cases
   })() as SubTab;
 
@@ -198,7 +198,7 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
           add: context.addUjiKlinik, 
           update: context.updateUjiKlinik as any,
           delete: context.deleteUjiKlinik,
-          title: 'Penelitian Uji Klinik',
+          title: 'Penelitian Uji Klinik (CRU)',
           formatter: formatUjiKlinikExcel,
           pdfGenerator: generateUjiKlinikPdf
         };
@@ -272,26 +272,156 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
           formatter: formatSubmissionCphmExcel,
           pdfGenerator: generateSubmissionCphmPdf
         };
-      case 'paten':
-        return { 
-          records: context.patenRecords, 
-          add: context.addPaten, 
-          update: context.updatePaten as any,
-          delete: context.deletePaten,
-          title: 'Paten',
-          formatter: formatPatenExcel,
-          pdfGenerator: generatePatenPdf
+      case 'paten_hki': {
+        const combinedRecords = [
+          ...context.hkiRecords.map(r => ({
+            id: r.id,
+            tanggalTerbit: r.tanggalTerbit,
+            namaAutor: r.namaAutor,
+            afiliasi: r.afiliasi,
+            judul: r.judulHki,
+            nomor: r.nomorHki,
+            buktiSertifikatName: r.buktiSertifikatHkiName || '',
+            buktiSertifikat: r.buktiSertifikatHki || '',
+            buktiSertifikatDriveUrl: r.buktiSertifikatHkiDriveUrl || '',
+            jenis: 'Karya Cipta' as const
+          })),
+          ...context.patenRecords.map(r => {
+            const isSederhana = r.nomorPaten.startsWith('[Paten Sederhana] ');
+            const isPatenPrefixed = r.nomorPaten.startsWith('[Paten] ');
+            const cleanNomor = isSederhana 
+              ? r.nomorPaten.replace('[Paten Sederhana] ', '') 
+              : (isPatenPrefixed ? r.nomorPaten.replace('[Paten] ', '') : r.nomorPaten);
+            const jenis = isSederhana ? 'Paten Sederhana' as const : 'Paten' as const;
+            return {
+              id: r.id,
+              tanggalTerbit: r.tanggalTerbit,
+              namaAutor: r.namaAutor,
+              afiliasi: r.afiliasi,
+              judul: r.judulPaten,
+              nomor: cleanNomor,
+              buktiSertifikatName: r.buktiSertifikatPatenName || '',
+              buktiSertifikat: r.buktiSertifikatPaten || '',
+              buktiSertifikatDriveUrl: r.buktiSertifikatPatenDriveUrl || '',
+              jenis: jenis
+            };
+          })
+        ];
+
+        return {
+          records: combinedRecords,
+          add: (form: any) => {
+            const { jenis, tanggalTerbit, namaAutor, afiliasi, judul, nomor, buktiSertifikatName, buktiSertifikat, buktiSertifikatDriveUrl } = form;
+            if (jenis === 'Karya Cipta') {
+              context.addHki({
+                tanggalTerbit: tanggalTerbit || '',
+                namaAutor: namaAutor || '',
+                afiliasi: afiliasi || '',
+                judulHki: judul || '',
+                nomorHki: nomor || '',
+                buktiSertifikatHki: buktiSertifikat || '',
+                buktiSertifikatHkiName: buktiSertifikatName || '',
+                buktiSertifikatHkiDriveUrl: buktiSertifikatDriveUrl || ''
+              });
+            } else {
+              const prefix = jenis === 'Paten Sederhana' ? '[Paten Sederhana] ' : '[Paten] ';
+              context.addPaten({
+                tanggalTerbit: tanggalTerbit || '',
+                namaAutor: namaAutor || '',
+                afiliasi: afiliasi || '',
+                judulPaten: judul || '',
+                nomorPaten: prefix + (nomor || ''),
+                buktiSertifikatPaten: buktiSertifikat || '',
+                buktiSertifikatPatenName: buktiSertifikatName || '',
+                buktiSertifikatPatenDriveUrl: buktiSertifikatDriveUrl || ''
+              });
+            }
+          },
+          update: (form: any) => {
+            const { id, jenis, tanggalTerbit, namaAutor, afiliasi, judul, nomor, buktiSertifikatName, buktiSertifikat, buktiSertifikatDriveUrl } = form;
+            const wasHki = context.hkiRecords.some(r => r.id === id);
+            const wasPaten = context.patenRecords.some(r => r.id === id);
+
+            if (jenis === 'Karya Cipta') {
+              if (wasHki) {
+                context.updateHki({
+                  id,
+                  tanggalTerbit: tanggalTerbit || '',
+                  namaAutor: namaAutor || '',
+                  afiliasi: afiliasi || '',
+                  judulHki: judul || '',
+                  nomorHki: nomor || '',
+                  buktiSertifikatHki: buktiSertifikat || '',
+                  buktiSertifikatHkiName: buktiSertifikatName || '',
+                  buktiSertifikatHkiDriveUrl: buktiSertifikatDriveUrl || ''
+                });
+              } else {
+                if (wasPaten) context.deletePaten(id);
+                context.addHki({
+                  tanggalTerbit: tanggalTerbit || '',
+                  namaAutor: namaAutor || '',
+                  afiliasi: afiliasi || '',
+                  judulHki: judul || '',
+                  nomorHki: nomor || '',
+                  buktiSertifikatHki: buktiSertifikat || '',
+                  buktiSertifikatHkiName: buktiSertifikatName || '',
+                  buktiSertifikatHkiDriveUrl: buktiSertifikatDriveUrl || ''
+                });
+              }
+            } else {
+              const prefix = jenis === 'Paten Sederhana' ? '[Paten Sederhana] ' : '[Paten] ';
+              const fullNomor = prefix + (nomor || '');
+              if (wasPaten) {
+                context.updatePaten({
+                  id,
+                  tanggalTerbit: tanggalTerbit || '',
+                  namaAutor: namaAutor || '',
+                  afiliasi: afiliasi || '',
+                  judulPaten: judul || '',
+                  nomorPaten: fullNomor,
+                  buktiSertifikatPaten: buktiSertifikat || '',
+                  buktiSertifikatPatenName: buktiSertifikatName || '',
+                  buktiSertifikatPatenDriveUrl: buktiSertifikatDriveUrl || ''
+                });
+              } else {
+                if (wasHki) context.deleteHki(id);
+                context.addPaten({
+                  tanggalTerbit: tanggalTerbit || '',
+                  namaAutor: namaAutor || '',
+                  afiliasi: afiliasi || '',
+                  judulPaten: judul || '',
+                  nomorPaten: fullNomor,
+                  buktiSertifikatPaten: buktiSertifikat || '',
+                  buktiSertifikatPatenName: buktiSertifikatName || '',
+                  buktiSertifikatPatenDriveUrl: buktiSertifikatDriveUrl || ''
+                });
+              }
+            }
+          },
+          delete: (id: string) => {
+            const wasHki = context.hkiRecords.some(r => r.id === id);
+            if (wasHki) {
+              context.deleteHki(id);
+            } else {
+              context.deletePaten(id);
+            }
+          },
+          title: 'Paten & HKI',
+          formatter: (recs: any[]) => {
+            return recs.map((r, idx) => ({
+              'No': idx + 1,
+              'Jenis': r.jenis,
+              'Tanggal Terbit': r.tanggalTerbit,
+              'Nama Autor/Inventor': r.namaAutor,
+              'Afiliasi': r.afiliasi,
+              'Judul': r.judul,
+              'Nomor Sertifikat/Permohonan': r.nomor,
+              'Nama File Sertifikat': r.buktiSertifikatName || '-'
+            }));
+          },
+          pdfGenerator: generatePatenHkiPdf
         };
-      case 'hki':
-        return { 
-          records: context.hkiRecords, 
-          add: context.addHki, 
-          update: context.updateHki as any,
-          delete: context.deleteHki,
-          title: 'Hak Cipta (HKI)',
-          formatter: formatHkiExcel,
-          pdfGenerator: generateHkiPdf
-        };
+      }
       default:
         return { 
           records: [], 
@@ -325,16 +455,23 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
 
   const [form, setForm] = useState<any>({});
   const [editForm, setEditForm] = useState<any>({});
+  const [arfSkemaCategoryAdd, setArfSkemaCategoryAdd] = useState<'Internal' | 'Eksternal'>('Internal');
+  const [arfSkemaCategoryEdit, setArfSkemaCategoryEdit] = useState<'Internal' | 'Eksternal'>('Internal');
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     add(form);
     setForm({});
+    setArfSkemaCategoryAdd('Internal');
   };
 
   const handleEdit = (rec: any) => {
     setEditForm({ ...rec });
     setEditId(rec.id);
+    if (normalizedTab === 'proposal_arf') {
+      const isInternal = rec.skema === 'ARF-A' || rec.skema === 'ARF-B';
+      setArfSkemaCategoryEdit(isInternal ? 'Internal' : 'Eksternal');
+    }
   };
 
   const handleUpdate = (e: React.FormEvent) => {
@@ -456,7 +593,7 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
             key: 'ranking', 
             label: 'Ranking jurnal', 
             type: 'select', 
-            options: ['Q1', 'Q2', 'Q3', 'Q4', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'Tidak Terakreditasi'] 
+            options: ['Q1', 'Q2', 'Q3', 'Q4', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'Tidak Terakreditasi', 'Jurnal Nasional Ber ISBN', 'Jurnal Internasional Tidak Bereputasi'] 
           },
           { key: 'tanggalPublikasi', label: 'Tanggal Publikasi', type: 'date' },
           { key: 'doiSitusWeb', label: 'DOI / Situs Web', placeholder: 'https://doi.org/...', type: 'text' },
@@ -508,7 +645,7 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
             key: 'skema', 
             label: 'Skema ARF', 
             type: 'select', 
-            options: ['ARF-A', 'ARF-B'] 
+            options: ['ARF-A (Internal)', 'ARF-B (Internal)', 'Eksternal'] 
           },
           { key: 'targetLuaran', label: 'Target Luaran', placeholder: 'Target luaran...', type: 'text' },
           { key: 'danaHibahDiperoleh', label: 'Dana Hibah Diperoleh', placeholder: 'Jumlah dana...', type: 'number' },
@@ -521,23 +658,15 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
           { key: 'afiliasi', label: 'Afiliasi', placeholder: 'Afiliasi...', type: 'text' },
           { key: 'fileArtikelName', label: 'Upload File Artikel (Nama File)', placeholder: 'Contoh: asuhan_gizi_cphm.pdf...', type: 'file' },
         ];
-      case 'paten':
+      case 'paten_hki':
         return [
+          { key: 'jenis', label: 'Jenis Karya', type: 'select', options: ['Karya Cipta', 'Paten', 'Paten Sederhana'] },
           { key: 'tanggalTerbit', label: 'Tanggal Terbit', type: 'date' },
-          { key: 'namaAutor', label: 'Nama Autor', placeholder: 'Nama autor...', type: 'text' },
-          { key: 'afiliasi', label: 'Afiliasi', placeholder: 'Afiliasi...', type: 'text' },
-          { key: 'judulPaten', label: 'Judul Paten', placeholder: 'Judul paten...', type: 'textarea' },
-          { key: 'nomorPaten', label: 'Nomor Paten', placeholder: 'Nomor paten...', type: 'text' },
-          { key: 'buktiSertifikatPatenName', label: 'Upload Bukti Sertifikat Paten (Nama File)', placeholder: 'sertifikat_paten_a.pdf...', type: 'file' },
-        ];
-      case 'hki':
-        return [
-          { key: 'tanggalTerbit', label: 'Tanggal Terbit', type: 'date' },
-          { key: 'namaAutor', label: 'Nama Autor', placeholder: 'Nama autor...', type: 'text' },
-          { key: 'afiliasi', label: 'Afiliasi', placeholder: 'Afiliasi...', type: 'text' },
-          { key: 'judulHki', label: 'Judul Hak Cipta (HKI)', placeholder: 'Judul HKI...', type: 'textarea' },
-          { key: 'nomorHki', label: 'Nomor HKI', placeholder: 'Nomor HKI...', type: 'text' },
-          { key: 'buktiSertifikatHkiName', label: 'Upload Bukti Sertifikat HKI (Nama File)', placeholder: 'sertifikat_hki_a.pdf...', type: 'file' },
+          { key: 'namaAutor', label: 'Nama Autor / Inventor', placeholder: 'Nama lengkap autor atau inventor...', type: 'text' },
+          { key: 'afiliasi', label: 'Afiliasi', placeholder: 'Afiliasi penulis atau inventor...', type: 'text' },
+          { key: 'judul', label: 'Judul Karya', placeholder: 'Judul lengkap paten atau HKI...', type: 'textarea' },
+          { key: 'nomor', label: 'Nomor Sertifikat / Permohonan', placeholder: 'Nomor sertifikat paten atau HKI...', type: 'text' },
+          { key: 'buktiSertifikatName', label: 'Upload Bukti Sertifikat (Nama File)', placeholder: 'sertifikat_karya_a.pdf...', type: 'file' },
         ];
       default:
         return [];
@@ -546,11 +675,42 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
 
   const fields = getFields();
 
+  const getVisibleFields = () => {
+    switch (normalizedTab) {
+      case 'penelitian_pendapatan':
+        return fields;
+      case 'uji_etik':
+        return fields.filter(f => ['tanggalSuratMasuk', 'namaPeneliti', 'judulPenelitian', 'hasilReview', 'pembayaranNominal'].includes(f.key));
+      case 'penelitian_uji_klinik':
+        return fields.filter(f => ['tahun', 'judulPenelitian', 'mitraKerjasama', 'danaRabPenelitian', 'status'].includes(f.key));
+      case 'penelitian_publikasi':
+        return fields.filter(f => ['namaAutor', 'judulArtikelIlmiah', 'namaJurnalTerbit', 'ranking'].includes(f.key));
+      case 'produk_inovasi':
+        return fields.filter(f => ['tahun', 'namaProduk', 'judulRisetInovasi', 'mitraKerjasama'].includes(f.key));
+      case 'produk_inovasi_terjual':
+        return fields;
+      case 'buku_isbn':
+        return fields.filter(f => ['tanggalTerbit', 'namaPenulis', 'judulBuku', 'nomorIsbn'].includes(f.key));
+      case 'pengabdian_masyarakat':
+        return fields;
+      case 'proposal_arf':
+        return fields.filter(f => ['ketuaPeneliti', 'judulPenelitian', 'skema', 'danaHibahDiperoleh'].includes(f.key));
+      case 'submission_cphm':
+        return fields;
+      case 'paten_hki':
+        return fields.filter(f => ['jenis', 'tanggalTerbit', 'namaAutor', 'judul', 'nomor'].includes(f.key));
+      default:
+        return fields.slice(0, 4);
+    }
+  };
+
+  const visibleFields = getVisibleFields();
+
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Inovasi & Penelitian</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Penelitian dan Inovasi</h1>
         </div>
         <div className="flex gap-2">
           <button 
@@ -597,7 +757,7 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
                   <thead>
                     <tr className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       <th className="px-6 py-4 w-16">No</th>
-                      {fields.slice(0, 4).map(f => (
+                      {visibleFields.map(f => (
                         <th key={f.key} className="px-6 py-4">{f.label}</th>
                       ))}
                       <th className="px-6 py-4 text-right w-24">Aksi</th>
@@ -609,7 +769,7 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
                         <td className="px-6 py-4">
                           <span className="text-xs font-bold text-slate-400">{(idx + 1).toString().padStart(2, '0')}</span>
                         </td>
-                        {fields.slice(0, 4).map(f => {
+                        {visibleFields.map(f => {
                           const val = rec[f.key];
                           const isCurrency = f.key.toLowerCase().includes('pendapatan') || f.key.toLowerCase().includes('dana') || f.key.toLowerCase().includes('pembayarannominal') || f.key.toLowerCase().includes('nominal');
                           const formattedValue = (typeof val === 'number' && isCurrency)
@@ -707,16 +867,77 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
                 <div key={f.key}>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">{f.label}</label>
                   {f.type === 'select' ? (
-                    <select
-                      value={form[f.key] || ''}
-                      onChange={(e) => setForm({...form, [f.key]: e.target.value})}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
-                    >
-                      <option value="">-- Pilih {f.label} --</option>
-                      {f.options?.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                    f.key === 'skema' && normalizedTab === 'proposal_arf' ? (() => {
+                      return (
+                        <div className="space-y-3">
+                          {/* Selector for Internal vs Eksternal */}
+                          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setArfSkemaCategoryAdd('Internal');
+                                setForm({ ...form, [f.key]: '' });
+                              }}
+                              className={cn(
+                                "flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                                arfSkemaCategoryAdd === 'Internal'
+                                  ? "bg-white text-slate-900 shadow-sm"
+                                  : "text-slate-500 hover:text-slate-800"
+                              )}
+                            >
+                              Internal
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setArfSkemaCategoryAdd('Eksternal');
+                                setForm({ ...form, [f.key]: '' });
+                              }}
+                              className={cn(
+                                "flex-1 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                                arfSkemaCategoryAdd === 'Eksternal'
+                                  ? "bg-white text-slate-900 shadow-sm"
+                                  : "text-slate-500 hover:text-slate-800"
+                              )}
+                            >
+                              Eksternal
+                            </button>
+                          </div>
+
+                          {/* Conditional Inputs */}
+                          {arfSkemaCategoryAdd === 'Internal' ? (
+                            <select
+                              value={form[f.key] || ''}
+                              onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
+                            >
+                              <option value="">-- Pilih Skema Internal --</option>
+                              <option value="ARF-A">ARF-A</option>
+                              <option value="ARF-B">ARF-B</option>
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={form[f.key] || ''}
+                              onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                              placeholder="Ketik Skema Eksternal..."
+                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
+                            />
+                          )}
+                        </div>
+                      );
+                    })() : (
+                      <select
+                        value={form[f.key] || ''}
+                        onChange={(e) => setForm({...form, [f.key]: e.target.value})}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
+                      >
+                        <option value="">-- Pilih {f.label} --</option>
+                        {f.options?.map(opt => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    )
                   ) : f.type === 'textarea' ? (
                     <textarea
                       value={form[f.key] || ''}
@@ -902,16 +1123,77 @@ export function Penelitian({ activeSubTab = 'penelitian_pendapatan', onChangeSub
                   <div key={f.key}>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">{f.label}</label>
                     {f.type === 'select' ? (
-                      <select
-                        value={editForm[f.key] || ''}
-                        onChange={(e) => setEditForm({...editForm, [f.key]: e.target.value})}
-                        className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
-                      >
-                        <option value="">-- Pilih {f.label} --</option>
-                        {f.options?.map(opt => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
+                      f.key === 'skema' && normalizedTab === 'proposal_arf' ? (() => {
+                        return (
+                          <div className="space-y-3">
+                            {/* Selector for Internal vs Eksternal */}
+                            <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setArfSkemaCategoryEdit('Internal');
+                                  setEditForm({ ...editForm, [f.key]: '' });
+                                }}
+                                className={cn(
+                                  "flex-1 py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                                  arfSkemaCategoryEdit === 'Internal'
+                                    ? "bg-white text-slate-900 shadow-sm"
+                                    : "text-slate-500 hover:text-slate-850"
+                                )}
+                              >
+                                Internal
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setArfSkemaCategoryEdit('Eksternal');
+                                  setEditForm({ ...editForm, [f.key]: '' });
+                                }}
+                                className={cn(
+                                  "flex-1 py-2.5 text-xs font-bold rounded-lg transition-all cursor-pointer",
+                                  arfSkemaCategoryEdit === 'Eksternal'
+                                    ? "bg-white text-slate-900 shadow-sm"
+                                    : "text-slate-500 hover:text-slate-850"
+                                )}
+                              >
+                                Eksternal
+                              </button>
+                            </div>
+
+                            {/* Conditional Inputs */}
+                            {arfSkemaCategoryEdit === 'Internal' ? (
+                              <select
+                                value={editForm[f.key] || ''}
+                                onChange={(e) => setEditForm({ ...editForm, [f.key]: e.target.value })}
+                                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
+                              >
+                                <option value="">-- Pilih Skema Internal --</option>
+                                <option value="ARF-A">ARF-A</option>
+                                <option value="ARF-B">ARF-B</option>
+                              </select>
+                            ) : (
+                              <input
+                                type="text"
+                                value={editForm[f.key] || ''}
+                                onChange={(e) => setEditForm({ ...editForm, [f.key]: e.target.value })}
+                                placeholder="Ketik Skema Eksternal..."
+                                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
+                              />
+                            )}
+                          </div>
+                        );
+                      })() : (
+                        <select
+                          value={editForm[f.key] || ''}
+                          onChange={(e) => setEditForm({...editForm, [f.key]: e.target.value})}
+                          className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:bg-white focus:ring-4 focus:ring-unair-blue/10 transition-all outline-none"
+                        >
+                          <option value="">-- Pilih {f.label} --</option>
+                          {f.options?.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      )
                     ) : f.type === 'textarea' ? (
                       <textarea
                         value={editForm[f.key] || ''}

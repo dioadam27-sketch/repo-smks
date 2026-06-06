@@ -32,7 +32,8 @@ export type TabType =
   | 'penelitian_proposal_arf'
   | 'penelitian_submission_cphm'
   | 'penelitian_paten'
-  | 'penelitian_hki';
+  | 'penelitian_hki'
+  | 'penelitian_paten_hki';
 
 export type ViewMode = 'portal' | 'dashboard' | 'smks' | 'smks_pendidikan' | 'smks_pelatihan' | 'smks_penelitian' | 'admin';
 

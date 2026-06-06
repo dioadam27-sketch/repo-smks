@@ -24,7 +24,7 @@ function getTabFromHash(hash: string): TabType {
   if (cleanHash === 'penelitian') return 'penelitian_pendapatan';
   if (cleanHash.startsWith('penelitian/')) {
     const sub = cleanHash.split('/')[1];
-    if (['pendapatan', 'uji_etik', 'uji_klinik', 'publikasi', 'produk', 'produk_terjual', 'buku', 'pengabdian', 'proposal_arf', 'submission_cphm', 'paten', 'hki'].includes(sub)) {
+    if (['pendapatan', 'uji_etik', 'uji_klinik', 'publikasi', 'produk', 'produk_terjual', 'buku', 'pengabdian', 'proposal_arf', 'submission_cphm', 'paten', 'hki', 'paten_hki'].includes(sub)) {
       return `penelitian_${sub}` as TabType;
     }
   }
@@ -164,7 +164,12 @@ export default function App() {
       const allowed = ['pelatihan_trainer_sertifikasi', 'pelatihan_internasional', 'pelatihan_standar_kemenkes', 'pelatihan_mandiri', 'pelatihan_kerjasama', 'pelatihan_inhouse', 'pelatihan_magang', 'pelatihan_studi'].filter(p => permissions.includes(p));
       return (allowed[0] || 'pelatihan_trainer_sertifikasi') as TabType;
     }
-    const allowed = ['penelitian_pendapatan', 'penelitian_uji_etik', 'penelitian_uji_klinik', 'penelitian_publikasi', 'penelitian_produk', 'penelitian_produk_terjual', 'penelitian_buku', 'penelitian_pengabdian', 'penelitian_proposal_arf', 'penelitian_submission_cphm', 'penelitian_paten', 'penelitian_hki'].filter(p => permissions.includes(p));
+    const allowed = ['penelitian_pendapatan', 'penelitian_uji_etik', 'penelitian_uji_klinik', 'penelitian_publikasi', 'penelitian_produk', 'penelitian_produk_terjual', 'penelitian_buku', 'penelitian_pengabdian', 'penelitian_proposal_arf', 'penelitian_submission_cphm', 'penelitian_paten_hki'].filter(p => {
+      if (p === 'penelitian_paten_hki') {
+        return permissions.includes('penelitian_paten_hki') || permissions.includes('penelitian_paten') || permissions.includes('penelitian_hki');
+      }
+      return permissions.includes(p);
+    });
     return (allowed[0] || 'penelitian_pendapatan') as TabType;
   };
 

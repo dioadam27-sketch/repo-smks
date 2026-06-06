@@ -399,7 +399,7 @@ export interface ProposalArfRecord {
   unitKerja: string;
   anggotaPeneliti: string;
   judulPenelitian: string;
-  skema: 'ARF-A' | 'ARF-B' | 'ARF-C' | 'ARF-D';
+  skema: string;
   targetLuaran: string;
   danaHibahDiperoleh: number;
 }
